@@ -123,6 +123,9 @@
   .cbtn:active{transform:scale(.94);}
   .cbtn.main{width:76px;height:76px;background:var(--shu);border:none;color:#fff;box-shadow:0 6px 18px rgba(158,43,30,.35);font-size:22px;}
   .cbtn.main:hover{background:var(--shu-deep);}
+  .skip-wrap{display:flex;justify-content:center;padding:2px 0 6px;}
+  .skip-btn{background:transparent;border:none;color:var(--sumi-faint);font-family:var(--gothic);font-size:13px;letter-spacing:.06em;cursor:pointer;padding:8px 14px;border-radius:8px;}
+  .skip-btn:hover{background:rgba(34,31,27,.05);color:var(--shu);}
 
   .done-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
   .done-seal{font-family:var(--mincho);color:#fff;background:var(--shu);width:96px;height:96px;border-radius:24px;display:grid;place-items:center;font-size:52px;box-shadow:0 10px 30px rgba(158,43,30,.35);margin-bottom:18px;transform:rotate(-4deg);}
@@ -433,6 +436,7 @@ function RunView({routine,onLog,onExit}){
   const idxRef=useRef(0);
   const runStartRef=useRef(Date.now());
   const actualsRef=useRef(steps.map(()=>0));
+  const skipsRef=useRef({});
   const loggedRef=useRef(false);
   const warnRef=useRef(-1), spokeRef=useRef(-1), saidRef=useRef(-1);
 
@@ -458,11 +462,12 @@ function RunView({routine,onLog,onExit}){
 
   const buildEntry=completed=>{
     const a=actualsRef.current.slice(0,steps.length);
+    const skips=steps.reduce((n,_,i)=>n+(skipsRef.current[i]?1:0),0);
     return {id:uid(),routineId:routine.id,routineName:routine.name,
       startISO:new Date(runStartRef.current).toISOString(),endISO:new Date().toISOString(),
-      plannedSec:total,actualSec:a.reduce((x,y)=>x+y,0),completed,
-      stepsDone:completed?steps.length:a.filter(v=>v>0).length,stepsTotal:steps.length,
-      steps:steps.map((s,i)=>({name:s.name,plannedSec:s.seconds,actualSec:a[i]||0}))};
+      plannedSec:total,actualSec:a.reduce((x,y)=>x+y,0),completed,skipped:skips,
+      stepsDone:a.filter((v,i)=>v>0&&!skipsRef.current[i]).length,stepsTotal:steps.length,
+      steps:steps.map((s,i)=>({name:s.name,plannedSec:s.seconds,actualSec:a[i]||0,skipped:!!skipsRef.current[i]}))};
   };
   const finish=()=>{
     if(!loggedRef.current){loggedRef.current=true;onLog(buildEntry(true));}
@@ -519,13 +524,25 @@ function RunView({routine,onLog,onExit}){
   useEffect(()=>()=>{releaseAwake();bg.stop();clearNotif();if(annTimer.current)clearTimeout(annTimer.current);try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){}},[]);
 
   const jumpTo=n=>{
-    const el=Date.now()-startAtRef.current;
+    const base=running?Date.now():pausedAtRef.current;
+    const el=base-startAtRef.current;
     actualsRef.current[idxRef.current]=Math.max(actualsRef.current[idxRef.current]||0,Math.round(Math.max(0,el-stepStart(idxRef.current))/1000));
-    startAtRef.current=Date.now()-stepStart(n);
+    startAtRef.current=base-stepStart(n);
     idxRef.current=n;setIdx(n);setRemaining(steps[n].seconds*1000);
     enterStep(n,120);
   };
   const next=()=>{ if(idx<steps.length-1)jumpTo(idx+1); else {actualsRef.current[idx]=Math.round((Date.now()-startAtRef.current-stepStart(idx))/1000);chime('done');finish();} };
+  /* Skip: drop this step entirely. Logged as skipped (0s), then move on. */
+  const skip=()=>{
+    const c=idxRef.current;
+    skipsRef.current[c]=true;actualsRef.current[c]=0;
+    if(c<steps.length-1){
+      const base=running?Date.now():pausedAtRef.current;
+      startAtRef.current=base-stepStart(c+1);
+      idxRef.current=c+1;setIdx(c+1);setRemaining(steps[c+1].seconds*1000);
+      enterStep(c+1,120);
+    }else{chime('done');finish();}
+  };
   const prev=()=>{const el=Date.now()-startAtRef.current;(el-stepStart(idx)>1200)?jumpTo(idx):(idx>0&&jumpTo(idx-1));};
   const toggle=()=>{
     if(running){pausedAtRef.current=Date.now();setRunning(false);}
@@ -543,7 +560,7 @@ function RunView({routine,onLog,onExit}){
   };
   const restart=()=>{
     runStartRef.current=Date.now();startAtRef.current=Date.now();
-    actualsRef.current=steps.map(()=>0);loggedRef.current=false;
+    actualsRef.current=steps.map(()=>0);skipsRef.current={};loggedRef.current=false;
     warnRef.current=-1;spokeRef.current=-1;saidRef.current=-1;idxRef.current=0;
     setIdx(0);setRemaining(steps[0].seconds*1000);setFinished(false);setRunning(true);
   };
@@ -606,6 +623,7 @@ function RunView({routine,onLog,onExit}){
         <button className="cbtn main" onClick={toggle}>{running?'❙❙':'▶'}</button>
         <button className="cbtn" onClick={next}>⏭</button>
       </div>
+      <div className="skip-wrap"><button className="skip-btn" onClick={skip}>⤼ このステップをスキップ</button></div>
     </div>
   );
 }
@@ -703,8 +721,8 @@ function LogView({logs,onDelete,onClear,onBack}){
       const dt=new Date(g.d+'T00:00:00');
       md+='\n## '+g.d+' ('+WD[dt.getDay()]+')\n';
       g.items.slice().reverse().forEach(e=>{
-        md+='- **'+hhmm(e.startISO)+'** '+e.routineName+' — 計画 '+fmtLong(e.plannedSec)+' / 実施 '+fmtLong(e.actualSec)+' — '+(e.completed?'✅ 完了':'⏸ 中断')+' ('+e.stepsDone+'/'+e.stepsTotal+')\n';
-        (e.steps||[]).forEach(s=>{md+='    - '+(s.name||'（無題）')+'　'+fmtLong(s.plannedSec)+' / '+(s.actualSec?fmtLong(s.actualSec):'—')+'\n';});
+        md+='- **'+hhmm(e.startISO)+'** '+e.routineName+' — 計画 '+fmtLong(e.plannedSec)+' / 実施 '+fmtLong(e.actualSec)+' — '+(e.completed?'✅ 完了':'⏸ 中断')+' ('+e.stepsDone+'/'+e.stepsTotal+')'+(e.skipped?' ・スキップ '+e.skipped:'')+'\n';
+        (e.steps||[]).forEach(s=>{const val=s.skipped?'スキップ':(s.actualSec?fmtLong(s.actualSec):'—');md+='    - '+(s.name||'（無題）')+'　'+fmtLong(s.plannedSec)+' / '+val+'\n';});
       });
     });
     return md;
@@ -739,7 +757,7 @@ function LogView({logs,onDelete,onClear,onBack}){
                 <div className="log-time">{hhmm(e.startISO)}</div>
                 <div className="log-body">
                   <div className="log-rn">{e.routineName}</div>
-                  <div className="log-sub">実施 {fmtLong(e.actualSec)} · 計画 {fmtLong(e.plannedSec)} · {e.stepsDone}/{e.stepsTotal}</div>
+                  <div className="log-sub">実施 {fmtLong(e.actualSec)} · 計画 {fmtLong(e.plannedSec)} · {e.stepsDone}/{e.stepsTotal}{e.skipped?' · スキップ '+e.skipped:''}</div>
                 </div>
                 <span className={'log-badge '+(e.completed?'badge-ok':'badge-cut')}>{e.completed?'完了':'中断'}</span>
                 <button className="log-x" onClick={()=>onDelete(e.id)}>×</button>
