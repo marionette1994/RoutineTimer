@@ -338,6 +338,11 @@ function fmtDelta(ms) {
   if (sec < 60) return 'ほぼ予定通り';
   return (ms > 0 ? '+' : '−') + fmtLong(sec);
 }
+function pct(arr, q) {
+  if (!arr.length) return 0;
+  const a = arr.slice().sort((x, y) => x - y);
+  return a[Math.min(a.length - 1, Math.max(0, Math.ceil(q * a.length) - 1))];
+}
 function median(arr) {
   if (!arr.length) return 0;
   const a = arr.slice().sort((x, y) => x - y);
@@ -415,7 +420,15 @@ function ListView(p) {
   }, "破棄"), /*#__PURE__*/React.createElement("button", {
     className: "rb-go",
     onClick: p.onResume
-  }, "再開"))), p.backupWarn && /*#__PURE__*/React.createElement("div", {
+  }, "再開"))), p.hasUpdate && /*#__PURE__*/React.createElement("div", {
+    className: "update-bar"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "ub-t"
+  }, "新しい版があります"), /*#__PURE__*/React.createElement("div", {
+    className: "ub-s"
+  }, "実行中でないいま、更新するのが安全です。")), /*#__PURE__*/React.createElement("button", {
+    onClick: p.onUpdate
+  }, "更新")), p.backupWarn && /*#__PURE__*/React.createElement("div", {
     className: "warn-bar",
     onClick: p.onOpenSettings
   }, /*#__PURE__*/React.createElement("span", {
@@ -758,6 +771,7 @@ function RunView({
   const runStartRef = useRef(init && init.runStartISO ? new Date(init.runStartISO).getTime() : t0);
   const actualsRef = useRef(init ? steps.map((_, i) => init.actualsMs[i] || 0) : steps.map(() => 0));
   const skipsRef = useRef(init && init.skips ? Object.assign({}, init.skips) : {});
+  const autoRef = useRef(init && init.autos ? Object.assign({}, init.autos) : {});
   const checksRef = useRef(init && init.checks ? init.checks : {});
   const loggedRef = useRef(false);
   const warnRef = useRef(-1),
@@ -777,6 +791,7 @@ function RunView({
       elapsedMs: Math.max(0, nowBase() - stepStartRef.current),
       actualsMs: actualsRef.current.slice(0, steps.length),
       skips: skipsRef.current,
+      autos: autoRef.current,
       checks: checksRef.current,
       runStartISO: new Date(runStartRef.current).toISOString(),
       savedAt: now
@@ -827,6 +842,7 @@ function RunView({
           actualSec: Math.round((a[i] || 0) / 1000),
           actualMs: a[i] || 0,
           skipped: !!skipsRef.current[i],
+          auto: !!autoRef.current[i],
           checkTotal: cs.length,
           checkDone: cs.filter(c => st[c.id]).length
         };
@@ -854,6 +870,7 @@ function RunView({
       let advanced = false;
       while (i < steps.length && !isManual(steps[i]) && el >= steps[i].seconds * 1000) {
         actualsRef.current[i] = steps[i].seconds * 1000;
+        autoRef.current[i] = true;
         stepStartRef.current += steps[i].seconds * 1000;
         el = now - stepStartRef.current;
         i++;
@@ -929,7 +946,10 @@ function RunView({
   }, []);
   const goTo = (n, record) => {
     const el = Math.max(0, nowBase() - stepStartRef.current);
-    if (record) actualsRef.current[idxRef.current] = Math.max(actualsRef.current[idxRef.current] || 0, el);
+    if (record) {
+      actualsRef.current[idxRef.current] = Math.max(actualsRef.current[idxRef.current] || 0, el);
+      autoRef.current[idxRef.current] = false;
+    }
     stepStartRef.current = nowBase();
     idxRef.current = n;
     setIdx(n);
@@ -940,6 +960,7 @@ function RunView({
   const next = () => {
     if (idx < steps.length - 1) goTo(idx + 1, true);else {
       actualsRef.current[idx] = Math.max(0, nowBase() - stepStartRef.current);
+      autoRef.current[idx] = false;
       chime('done');
       finish();
     }
@@ -991,6 +1012,7 @@ function RunView({
     stepStartRef.current = Date.now();
     actualsRef.current = steps.map(() => 0);
     skipsRef.current = {};
+    autoRef.current = {};
     checksRef.current = {};
     setChecks({});
     loggedRef.current = false;
@@ -1399,8 +1421,13 @@ function LogView({
   const rows = [];
   if (curR) {
     curR.steps.forEach((st, i) => {
-      const vals = [];
-      let skip = 0,
+      /* A timed-out step only tells us the duration was "at least the budget" —
+         it is a censored observation, not a measurement. Mixing those into the
+         median drags it up towards the budget, so they are counted separately
+         and never feed the recommendation. */
+      const done = [];
+      let auto = 0,
+        skip = 0,
         over = 0,
         seen = 0;
       runs.forEach(e => {
@@ -1412,27 +1439,34 @@ function LogView({
           return;
         }
         const v = rec.actualMs ? rec.actualMs / 1000 : rec.actualSec;
-        if (v > 0) {
-          vals.push(v);
-          if (v > rec.plannedSec) over++;
+        if (v <= 0) return;
+        if (rec.auto) {
+          auto++;
+          return;
         }
+        done.push(v);
+        if (v > rec.plannedSec) over++;
       });
-      const med = Math.round(median(vals));
+      const med = Math.round(median(done));
+      /* Budgeting at the median guarantees running out half the time, so the
+         suggestion is the 75th percentile of the hand-finished runs. */
+      const rec = done.length >= 3 ? Math.max(5, Math.round(pct(done, .75) / 5) * 5) : null;
       rows.push({
         i: i,
         label: st.name || 'ステップ ' + (i + 1),
         planned: st.seconds,
         manual: isManual(st),
         med: med,
-        n: vals.length,
+        n: done.length,
+        auto: auto,
         skip: skip,
         seen: seen,
         over: over,
-        rec: vals.length >= 2 ? Math.max(5, Math.round(med / 5) * 5) : null
+        rec: rec && rec !== st.seconds ? rec : null
       });
     });
   }
-  const applicable = rows.filter(r => r.rec && curR && curR.steps[r.i] && r.rec !== curR.steps[r.i].seconds);
+  const applicable = rows.filter(r => r.rec && curR && curR.steps[r.i]);
   const applyRec = () => {
     if (!applicable.length || !curR) return;
     if (!confirm(applicable.length + '件のステップ時間を実測の中央値に更新します。よろしいですか？')) return;
@@ -1450,7 +1484,8 @@ function LogView({
       g.items.slice().reverse().forEach(e => {
         md += '- **' + hhmm(e.startISO) + '** ' + e.routineName + ' — 計画 ' + fmtLong(e.plannedSec) + ' / 実施 ' + fmtLong(e.actualSec) + ' — ' + (e.completed ? '✅ 完了' : '⏸ 中断') + ' (' + e.stepsDone + '/' + e.stepsTotal + ')' + (e.skipped ? ' ・スキップ ' + e.skipped : '') + '\n';
         (e.steps || []).forEach(s => {
-          const val = s.skipped ? 'スキップ' : s.actualSec ? fmtLong(s.actualSec) : '—';
+          const tag = s.auto ? ' `[時間切れ]`' : s.mode === 'manual' ? ' `[完了ボタン]`' : ' `[手押し]`';
+          const val = s.skipped ? 'スキップ' : s.actualSec ? fmtLong(s.actualSec) + tag : '—';
           const ck = s.checkTotal ? '　☑' + s.checkDone + '/' + s.checkTotal : '';
           md += '    - ' + (s.name || '（無題）') + '　' + fmtLong(s.plannedSec) + ' / ' + val + ck + '\n';
         });
@@ -1552,7 +1587,7 @@ function LogView({
       className: "dim sm"
     }, " 完了ボタン") : null), /*#__PURE__*/React.createElement("span", {
       className: "n"
-    }, r.n ? r.n + '回' : 'データ不足')), /*#__PURE__*/React.createElement("div", {
+    }, r.n ? '実測 ' + r.n + '回' : r.auto ? '実測なし' : 'データなし')), /*#__PURE__*/React.createElement("div", {
       className: "stat-b"
     }, /*#__PURE__*/React.createElement("span", {
       className: "pl"
@@ -1562,9 +1597,15 @@ function LogView({
       className: "md"
     }, r.n ? fmtLong(r.med) : '—'), r.n > 0 && /*#__PURE__*/React.createElement("span", {
       className: 'df ' + cls
-    }, d > 0 ? '+' : d < 0 ? '−' : '±', fmtLong(Math.abs(d))), /*#__PURE__*/React.createElement("span", {
-      className: "sk"
-    }, r.n > 0 ? '超過 ' + Math.round(r.over / r.n * 100) + '%' : '', r.skip > 0 ? (r.n > 0 ? ' · ' : '') + 'スキップ ' + Math.round(r.skip / Math.max(1, r.seen) * 100) + '%' : '')));
+    }, d > 0 ? '+' : d < 0 ? '−' : '±', fmtLong(Math.abs(d))), r.rec && /*#__PURE__*/React.createElement("span", {
+      className: "rc"
+    }, "推奨 ", fmtLong(r.rec))), /*#__PURE__*/React.createElement("div", {
+      className: "stat-f"
+    }, !r.manual && r.auto > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "warnmark"
+    }, "時間切れ ", r.auto, "/", r.auto + r.n, " 回"), r.manual && r.n > 0 && /*#__PURE__*/React.createElement("span", null, "目安超過 ", Math.round(r.over / r.n * 100), "%"), r.skip > 0 && /*#__PURE__*/React.createElement("span", null, "スキップ ", r.skip, " 回"), !r.manual && r.n === 0 && r.auto > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "warnmark"
+    }, "毎回時間切れ — 実際の所要時間は不明です"), r.n > 0 && r.n < 3 && /*#__PURE__*/React.createElement("span", null, "推奨には3回以上の実測が必要です")));
   }), /*#__PURE__*/React.createElement("div", {
     className: "apply-box"
   }, /*#__PURE__*/React.createElement("button", {
@@ -1577,7 +1618,7 @@ function LogView({
       textAlign: 'center',
       paddingTop: 10
     }
-  }, "2回以上記録のあるステップだけを、実測の中央値（5秒単位）に合わせます。"))) : filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "時間切れで自動的に進んだ回は実測に数えません。手で終えた記録が3回以上あるステップだけ、その75パーセンタイル（5秒単位）を推奨します。中央値だと半分は時間切れになるためです。"))) : filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "empty",
     style: {
       padding: '40px 20px'
@@ -1640,6 +1681,10 @@ function App() {
   });
   const [pending, setPending] = useState(() => load(AKEY, null));
   const [resumeState, setResumeState] = useState(null);
+  const [hasUpdate, setHasUpdate] = useState(false);
+  useEffect(() => {
+    initSW(() => setHasUpdate(true));
+  }, []);
   useEffect(() => save(RKEY, routines), [routines]);
   useEffect(() => save(LKEY, logs), [logs]);
   useEffect(() => {
@@ -1766,6 +1811,8 @@ function App() {
     routines: routines,
     pending: pendInfo,
     backupWarn: backupWarn,
+    hasUpdate: hasUpdate,
+    onUpdate: applyUpdate,
     onResume: doResume,
     onDiscard: doDiscard,
     onRun: startRun,
@@ -1784,8 +1831,37 @@ function App() {
   });
 }
 ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
-if ('serviceWorker' in navigator) {
+
+/* The new worker is left waiting rather than taking over immediately: swapping
+   assets underneath a running two-hour routine is not something to do silently.
+   The list screen offers the update, and only then do we activate and reload. */
+let swReg = null;
+function initSW(onUpdate) {
+  if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      swReg = reg;
+      if (reg.waiting && navigator.serviceWorker.controller) onUpdate();
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) onUpdate();
+        });
+      });
+    }).catch(() => {});
   });
+}
+function applyUpdate() {
+  if (!swReg || !swReg.waiting) {
+    location.reload();
+    return;
+  }
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+  swReg.waiting.postMessage('SKIP_WAITING');
 }
