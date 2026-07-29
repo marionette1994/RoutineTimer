@@ -180,6 +180,10 @@ function chime(kind) {
         warn: {
           n: [[620, 0]],
           v: .13
+        },
+        ready: {
+          n: [[1047, 0], [1047, .16], [1047, .32]],
+          v: .2
         }
       }[kind] || {
         n: [[880, 0]],
@@ -205,7 +209,8 @@ function chime(kind) {
       const p = {
         step: [70],
         done: [110, 55, 110, 55, 220],
-        warn: [40]
+        warn: [40],
+        ready: [90, 60, 90]
       }[kind] || [60];
       navigator.vibrate && navigator.vibrate(p);
     } catch (e) {}
@@ -376,9 +381,13 @@ function download(name, text, mime) {
     alert('書き出しに失敗しました');
   }
 }
-function stepBadges(s) {
+function stepBadges(s, all) {
   const b = [];
   if (isManual(s)) b.push('完了ボタン');
+  if (s.dep && s.dep.after) {
+    const src = (all || []).find(x => x.id === s.dep.after);
+    b.push('⏳' + (src ? src.name || '前の工程' : '前の工程') + 'から' + Math.round((s.dep.sec || 0) / 60) + '分');
+  }
   if (s.days && s.days.length && s.days.length < 7) b.push(s.days.slice().sort().map(d => WD[d]).join(''));
   if (s.checks && s.checks.length) b.push('☑' + s.checks.length);
   return b;
@@ -529,6 +538,32 @@ function EditView({
       days: cur.length === 0 || cur.length === 7 ? null : cur.sort()
     });
   };
+  const setDep = (id, after) => {
+    if (!after) {
+      upd(id, {
+        dep: null
+      });
+      return;
+    }
+    const cur = steps.find(x => x.id === id);
+    upd(id, {
+      dep: {
+        after: after,
+        sec: cur.dep && cur.dep.sec || 1800
+      }
+    });
+  };
+  const setDepMin = (id, m) => {
+    const cur = steps.find(x => x.id === id);
+    if (!cur.dep) return;
+    const v = Math.max(0, Math.min(600, parseInt(m || '0', 10) || 0));
+    upd(id, {
+      dep: {
+        after: cur.dep.after,
+        sec: v * 60
+      }
+    });
+  };
   const addCheck = id => upd(id, {
     checks: (steps.find(s => s.id === id).checks || []).concat([{
       id: uid(),
@@ -545,14 +580,19 @@ function EditView({
     checks: (steps.find(s => s.id === id).checks || []).filter(c => c.id !== cid)
   });
   const doSave = () => {
-    const clean = steps.map(s => Object.assign({}, s, {
-      name: s.name.trim(),
-      seconds: Math.max(1, s.seconds),
-      checks: (s.checks || []).filter(c => c.text.trim()).map(c => ({
-        id: c.id,
-        text: c.text.trim()
-      }))
-    }));
+    const clean = steps.map((s, i) => {
+      const earlier = steps.slice(0, i).map(x => x.id);
+      const dep = s.dep && s.dep.after && earlier.indexOf(s.dep.after) >= 0 ? s.dep : null;
+      return Object.assign({}, s, {
+        name: s.name.trim(),
+        seconds: Math.max(1, s.seconds),
+        dep: dep,
+        checks: (s.checks || []).filter(c => c.text.trim()).map(c => ({
+          id: c.id,
+          text: c.text.trim()
+        }))
+      });
+    });
     onSave(Object.assign({}, routine, {
       name: name.trim() || '名称未設定',
       targetEnd: targetEnd || null,
@@ -591,7 +631,7 @@ function EditView({
   }, /*#__PURE__*/React.createElement("label", null, "ステップ"), /*#__PURE__*/React.createElement("div", {
     className: "steps"
   }, steps.map((s, i) => {
-    const badges = stepBadges(s);
+    const badges = stepBadges(s, steps);
     return /*#__PURE__*/React.createElement("div", {
       className: "step-box",
       key: s.id
@@ -701,6 +741,29 @@ function EditView({
         onClick: () => toggleDay(s, di)
       }, w);
     }))), /*#__PURE__*/React.createElement("div", {
+      className: "det-row dep-row"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "det-l"
+    }, "前提"), /*#__PURE__*/React.createElement("div", {
+      className: "dep-box"
+    }, /*#__PURE__*/React.createElement("select", {
+      value: s.dep && s.dep.after ? s.dep.after : '',
+      onChange: e => setDep(s.id, e.target.value)
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "なし"), steps.slice(0, i).map((o, j) => /*#__PURE__*/React.createElement("option", {
+      key: o.id,
+      value: o.id
+    }, o.name || 'ステップ ' + (j + 1)))), s.dep && s.dep.after && /*#__PURE__*/React.createElement("span", {
+      className: "dep-t"
+    }, "の開始から", /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      inputMode: "numeric",
+      value: Math.round((s.dep.sec || 0) / 60),
+      onChange: e => setDepMin(s.id, e.target.value)
+    }), "分後"))), /*#__PURE__*/React.createElement("p", {
+      className: "det-hint"
+    }, s.dep && s.dep.after ? 'この時刻まではこのステップを始めません。準備できると通知します。' : '炊飯器や洗濯機など、待ち時間のある工程の後に置くステップで使います。'), /*#__PURE__*/React.createElement("div", {
       className: "det-col"
     }, /*#__PURE__*/React.createElement("span", {
       className: "det-l"
@@ -741,66 +804,124 @@ function EditView({
    Timing is per-step and wall-clock based: elapsed = now - stepStart. A step
    that waits on a button simply never reaches its planned duration, so manual
    and timed steps share one model. A frozen tab is caught up by cascading
-   through any timed steps whose time passed while we were away. */
+   through any timed steps whose time passed while we were away.
+
+   A step may also declare a prerequisite: "cannot begin until N seconds after
+   step X started". Those ready times are absolute — a rice cooker does not
+   pause when the routine does — so they are computed from raw wall-clock and
+   are deliberately not routed through nowBase(). */
 function RunView({
   routine,
   resume,
   onLog,
   onExit
 }) {
-  const init = resume && resume.routineId === routine.id && Array.isArray(resume.actualsMs) ? resume : null;
-  const [steps] = useState(() => {
-    const dow = init && typeof init.dow === 'number' ? init.dow : new Date().getDay();
-    const f = activeFor(routine.steps, dow);
-    return f.length ? f : routine.steps;
+  const init = resume && resume.routineId === routine.id && resume.actualsMs ? resume : null;
+  const dow0 = init && typeof init.dow === 'number' ? init.dow : new Date().getDay();
+  const [steps, setSteps] = useState(() => {
+    const f = activeFor(routine.steps, dow0);
+    const base = f.length ? f : routine.steps;
+    if (init && Array.isArray(init.order)) {
+      const byId = {};
+      base.forEach(x => {
+        byId[x.id] = x;
+      });
+      const ord = [];
+      init.order.forEach(id => {
+        if (byId[id] && ord.indexOf(byId[id]) < 0) ord.push(byId[id]);
+      });
+      base.forEach(x => {
+        if (ord.indexOf(x) < 0) ord.push(x);
+      });
+      return ord;
+    }
+    return base;
   });
-  const dowRef = useRef(init && typeof init.dow === 'number' ? init.dow : new Date().getDay());
+  const dowRef = useRef(dow0);
   const total = plannedTotal(steps);
   const initIdx = init ? Math.max(0, Math.min(init.idx || 0, steps.length - 1)) : 0;
-  const initEl = init ? Math.max(0, init.elapsedMs || 0) : 0;
   const t0 = Date.now();
   const [idx, setIdx] = useState(initIdx);
-  const [elapsed, setElapsed] = useState(initEl);
+  const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(!init);
   const [finished, setFinished] = useState(false);
   const [bgOn, setBgOn] = useState(false);
   const [checks, setChecks] = useState(() => init && init.checks ? init.checks : {});
-  const stepStartRef = useRef(t0 - initEl);
+
+  /* Everything the run accumulates is keyed by step id, not position, so that
+     deferring a step (swapping it with the next) cannot scramble the record. */
+  const cp = o => Object.assign({}, o || {});
+  /* Time the page was dead is given back to the routine clock, but not to the
+     prerequisites: the cooker kept going while the tab was gone. */
+  const shift = init ? Math.max(0, t0 - (init.savedAt || t0)) : 0;
+  /* stepStartAt is stored as an offset from the save moment, so a run picked up
+     hours later resumes where it stood rather than instantly timing out. */
+  const stepStartRef = useRef(init && typeof init.stepStartAt === 'number' ? t0 + init.stepStartAt : t0);
   const pausedAtRef = useRef(init ? t0 : 0);
   const idxRef = useRef(initIdx);
   const runStartRef = useRef(init && init.runStartISO ? new Date(init.runStartISO).getTime() : t0);
-  const actualsRef = useRef(init ? steps.map((_, i) => init.actualsMs[i] || 0) : steps.map(() => 0));
-  const skipsRef = useRef(init && init.skips ? Object.assign({}, init.skips) : {});
-  const autoRef = useRef(init && init.autos ? Object.assign({}, init.autos) : {});
-  const checksRef = useRef(init && init.checks ? init.checks : {});
+  const actualsRef = useRef(cp(init && init.actualsMs));
+  const skipsRef = useRef(cp(init && init.skips));
+  const autoRef = useRef(cp(init && init.autos));
+  const checksRef = useRef(cp(init && init.checks));
+  const startedRef = useRef((() => {
+    const m = cp(init && init.startedAt);
+    const cur = steps[initIdx];
+    if (cur && m[cur.id]) m[cur.id] += shift;
+    return m;
+  })());
+  const arrivedRef = useRef(cp(init && init.arrivedAt));
+  const readyAnnRef = useRef(cp(init && init.readyAnn));
   const loggedRef = useRef(false);
-  const warnRef = useRef(-1),
-    spokeRef = useRef(-1),
-    saidRef = useRef(-1);
+  const warnRef = useRef(null),
+    spokeRef = useRef(null),
+    saidRef = useRef(null),
+    gateRef = useRef(null);
   const annTimer = useRef(null),
     lastSaveRef = useRef(0);
   const nowBase = () => running ? Date.now() : pausedAtRef.current || Date.now();
+
+  /* null when the step has no prerequisite, or when its source never ran
+     (a weekday-filtered or skipped source must not deadlock the routine). */
+  const readyAt = st => {
+    if (!st || !st.dep || !st.dep.after) return null;
+    const began = startedRef.current[st.dep.after];
+    if (!began) return null;
+    return began + (st.dep.sec || 0) * 1000;
+  };
+  const depSourceName = st => {
+    if (!st || !st.dep) return '';
+    const src = routine.steps.find(x => x.id === st.dep.after);
+    return src ? src.name || '前のステップ' : '前のステップ';
+  };
   const persist = force => {
     const now = Date.now();
     if (!force && now - lastSaveRef.current < 1000) return;
     lastSaveRef.current = now;
+    const cur = steps[idxRef.current];
     save(AKEY, {
       routineId: routine.id,
       dow: dowRef.current,
       idx: idxRef.current,
-      elapsedMs: Math.max(0, nowBase() - stepStartRef.current),
-      actualsMs: actualsRef.current.slice(0, steps.length),
+      order: steps.map(x => x.id),
+      stepStartAt: stepStartRef.current - now,
+      stepName: cur ? cur.name || 'ステップ ' + (idxRef.current + 1) : '',
+      actualsMs: actualsRef.current,
       skips: skipsRef.current,
       autos: autoRef.current,
       checks: checksRef.current,
+      startedAt: startedRef.current,
+      arrivedAt: arrivedRef.current,
+      readyAnn: readyAnnRef.current,
       runStartISO: new Date(runStartRef.current).toISOString(),
       savedAt: now
     });
   };
   const enterStep = (i, delay) => {
     saidRef.current = i;
-    warnRef.current = -1;
-    spokeRef.current = -1;
+    warnRef.current = null;
+    spokeRef.current = null;
+    gateRef.current = null;
     if (annTimer.current) {
       clearTimeout(annTimer.current);
       annTimer.current = null;
@@ -809,15 +930,34 @@ function RunView({
       window.speechSynthesis && window.speechSynthesis.cancel();
     } catch (e) {}
     const st = steps[i];
+    if (!st) return;
     const nm = st.name || 'ステップ ' + (i + 1);
     const sub = (isManual(st) ? '目安 ' + fmtLong(st.seconds) : fmtLong(st.seconds)) + '　（' + (i + 1) + '/' + steps.length + '）';
     setMedia(nm, sub);
     notify('▶ ' + nm, sub, document.hidden);
     if (SETTINGS.speakStart) annTimer.current = setTimeout(() => speak(nm + '、' + (isManual(st) ? '完了したら押してください' : fmtLong(st.seconds))), delay || 120);
   };
+  const enterWait = (i, until) => {
+    gateRef.current = i;
+    saidRef.current = null;
+    if (annTimer.current) {
+      clearTimeout(annTimer.current);
+      annTimer.current = null;
+    }
+    const st = steps[i];
+    if (!st) return;
+    const nm = st.name || 'ステップ ' + (i + 1);
+    const sub = depSourceName(st) + ' の準備待ち　' + fmtClock(until) + ' まで';
+    setMedia('⏳ ' + nm, sub);
+    notify('⏳ ' + nm, sub, false);
+    if (SETTINGS.speakStart) annTimer.current = setTimeout(() => speak(depSourceName(st) + 'の準備を待っています'), 150);
+  };
   const buildEntry = completed => {
-    const a = actualsRef.current.slice(0, steps.length);
-    const skips = steps.reduce((n, _, i) => n + (skipsRef.current[i] ? 1 : 0), 0);
+    const A = actualsRef.current,
+      S = skipsRef.current,
+      U = autoRef.current;
+    const sum = steps.reduce((n, x) => n + (A[x.id] || 0), 0);
+    const skips = steps.reduce((n, x) => n + (S[x.id] ? 1 : 0), 0);
     return {
       id: uid(),
       routineId: routine.id,
@@ -826,23 +966,30 @@ function RunView({
       startISO: new Date(runStartRef.current).toISOString(),
       endISO: new Date().toISOString(),
       plannedSec: total,
-      actualSec: Math.round(a.reduce((x, y) => x + y, 0) / 1000),
+      actualSec: Math.round(sum / 1000),
       completed: completed,
       skipped: skips,
-      stepsDone: a.filter((v, i) => v > 0 && !skipsRef.current[i]).length,
+      stepsDone: steps.filter(x => (A[x.id] || 0) > 0 && !S[x.id]).length,
       stepsTotal: steps.length,
-      steps: steps.map((s, i) => {
-        const cs = s.checks || [];
-        const st = checksRef.current[i] || {};
+      steps: steps.map((x, i) => {
+        const cs = x.checks || [];
+        const st = checksRef.current[x.id] || {};
+        const began = startedRef.current[x.id] || 0,
+          came = arrivedRef.current[x.id] || 0;
+        const rdy = x.dep && startedRef.current[x.dep.after] ? startedRef.current[x.dep.after] + (x.dep.sec || 0) * 1000 : 0;
         return {
-          id: s.id,
-          name: s.name,
-          mode: s.mode || 'timer',
-          plannedSec: s.seconds,
-          actualSec: Math.round((a[i] || 0) / 1000),
-          actualMs: a[i] || 0,
-          skipped: !!skipsRef.current[i],
-          auto: !!autoRef.current[i],
+          id: x.id,
+          name: x.name,
+          mode: x.mode || 'timer',
+          plannedSec: x.seconds,
+          actualSec: Math.round((A[x.id] || 0) / 1000),
+          actualMs: A[x.id] || 0,
+          skipped: !!S[x.id],
+          auto: !!U[x.id],
+          /* waitSec: held back by a prerequisite. idleSec: it was ready and we
+             did not get to it. The two are mutually exclusive by construction. */
+          waitSec: rdy && came && began > came ? Math.round((began - came) / 1000) : 0,
+          idleSec: rdy && came && came > rdy ? Math.round((came - rdy) / 1000) : 0,
           checkTotal: cs.length,
           checkDone: cs.filter(c => st[c.id]).length
         };
@@ -866,16 +1013,38 @@ function RunView({
     const tick = () => {
       const now = Date.now();
       let i = idxRef.current;
-      let el = now - stepStartRef.current;
+      let carry = stepStartRef.current;
       let advanced = false;
-      while (i < steps.length && !isManual(steps[i]) && el >= steps[i].seconds * 1000) {
-        actualsRef.current[i] = steps[i].seconds * 1000;
-        autoRef.current[i] = true;
-        stepStartRef.current += steps[i].seconds * 1000;
-        el = now - stepStartRef.current;
-        i++;
-        advanced = true;
+      let gateUntil = null;
+      for (;;) {
+        const cur = steps[i];
+        if (!cur) break;
+        if (!arrivedRef.current[cur.id]) arrivedRef.current[cur.id] = now;
+        let begin = startedRef.current[cur.id];
+        if (!begin) {
+          const g = readyAt(cur);
+          const b = g && g > carry ? g : carry;
+          /* Held back: leave `carry` alone. Writing the gate into it would let
+             a later pause drag the prerequisite's own deadline along with it. */
+          if (now < b) {
+            gateUntil = b;
+            break;
+          }
+          begin = b;
+          startedRef.current[cur.id] = b;
+        }
+        if (!isManual(cur) && now - begin >= cur.seconds * 1000) {
+          actualsRef.current[cur.id] = cur.seconds * 1000;
+          autoRef.current[cur.id] = true;
+          carry = begin + cur.seconds * 1000;
+          i++;
+          advanced = true;
+          continue;
+        }
+        carry = begin;
+        break;
       }
+      stepStartRef.current = carry;
       if (i >= steps.length) {
         idxRef.current = steps.length - 1;
         chime('done');
@@ -883,33 +1052,50 @@ function RunView({
         finish();
         return;
       }
-      if (advanced) {
+      if (i !== idxRef.current) {
         idxRef.current = i;
         setIdx(i);
-        chime('step');
-        enterStep(i, 450);
-      } else if (saidRef.current !== i) {
-        enterStep(i, 120);
+        if (advanced) chime('step');
       }
+
+      /* Anything further down the list that just became available is announced
+         where we stand, so a cooker finishing is heard from another app. */
+      steps.forEach((x, j) => {
+        if (j <= i || readyAnnRef.current[x.id]) return;
+        const g = readyAt(x);
+        if (g && now >= g) {
+          readyAnnRef.current[x.id] = true;
+          chime('ready');
+          notify('✔ 準備できました', (x.name || '次の工程') + ' を始められます', true);
+          speak((x.name || '次の工程') + 'の準備ができました');
+        }
+      });
       const cur = steps[i];
-      if (!isManual(cur)) {
-        const left = cur.seconds * 1000 - el;
-        if (cur.seconds >= 60 && spokeRef.current !== i && left <= 30000) {
-          spokeRef.current = i;
-          speak('残り30秒です');
+      if (gateUntil) {
+        if (gateRef.current !== i) enterWait(i, gateUntil);
+        setElapsed(now - gateUntil);
+      } else {
+        const begin = startedRef.current[cur.id] || carry;
+        if (saidRef.current !== i) enterStep(i, advanced ? 450 : 120);
+        if (!isManual(cur)) {
+          const left = cur.seconds * 1000 - (now - begin);
+          if (cur.seconds >= 60 && spokeRef.current !== i && left <= 30000) {
+            spokeRef.current = i;
+            speak('残り30秒です');
+          }
+          if (cur.seconds > 11 && warnRef.current !== i && left <= 10000) {
+            warnRef.current = i;
+            chime('warn');
+          }
         }
-        if (cur.seconds > 11 && warnRef.current !== i && left <= 10000) {
-          warnRef.current = i;
-          chime('warn');
-        }
+        setElapsed(now - begin);
       }
-      setElapsed(el);
       persist(false);
     };
     tick();
     const t = setInterval(tick, 200);
     return () => clearInterval(t);
-  }, [running, finished]);
+  }, [running, finished, steps]);
   useEffect(() => {
     if (running && !finished) {
       keepAwake();
@@ -945,31 +1131,36 @@ function RunView({
     } catch (e) {}
   }, []);
   const goTo = (n, record) => {
+    const cur = steps[idxRef.current];
     const el = Math.max(0, nowBase() - stepStartRef.current);
-    if (record) {
-      actualsRef.current[idxRef.current] = Math.max(actualsRef.current[idxRef.current] || 0, el);
-      autoRef.current[idxRef.current] = false;
+    if (record && cur) {
+      actualsRef.current[cur.id] = Math.max(actualsRef.current[cur.id] || 0, el);
+      autoRef.current[cur.id] = false;
     }
     stepStartRef.current = nowBase();
+    const dest = steps[n];
+    if (dest) delete startedRef.current[dest.id];
     idxRef.current = n;
     setIdx(n);
     setElapsed(0);
-    enterStep(n, 120);
+    gateRef.current = null;
+    saidRef.current = null;
     persist(true);
   };
   const next = () => {
+    const cur = steps[idx];
     if (idx < steps.length - 1) goTo(idx + 1, true);else {
-      actualsRef.current[idx] = Math.max(0, nowBase() - stepStartRef.current);
-      autoRef.current[idx] = false;
+      actualsRef.current[cur.id] = Math.max(0, nowBase() - stepStartRef.current);
+      autoRef.current[cur.id] = false;
       chime('done');
       finish();
     }
   };
   const skip = () => {
-    const c = idxRef.current;
-    skipsRef.current[c] = true;
-    actualsRef.current[c] = 0;
-    if (c < steps.length - 1) goTo(c + 1, false);else {
+    const cur = steps[idxRef.current];
+    skipsRef.current[cur.id] = true;
+    actualsRef.current[cur.id] = 0;
+    if (idxRef.current < steps.length - 1) goTo(idxRef.current + 1, false);else {
       chime('done');
       finish();
     }
@@ -978,12 +1169,32 @@ function RunView({
     const el = nowBase() - stepStartRef.current;
     if (el > 1200) goTo(idx, false);else if (idx > 0) goTo(idx - 1, false);
   };
+  /* Not ready yet? Trade places with the next step rather than idle. */
+  const defer = () => {
+    const i = idxRef.current;
+    if (i >= steps.length - 1) return;
+    const a = steps.slice();
+    const t = a[i];
+    a[i] = a[i + 1];
+    a[i + 1] = t;
+    delete arrivedRef.current[t.id];
+    delete startedRef.current[a[i].id];
+    setSteps(a);
+    stepStartRef.current = Date.now();
+    gateRef.current = null;
+    saidRef.current = null;
+    setElapsed(0);
+    persist(true);
+  };
   const toggle = () => {
     if (running) {
       pausedAtRef.current = Date.now();
       setRunning(false);
     } else {
-      stepStartRef.current += Date.now() - pausedAtRef.current;
+      const d = Date.now() - pausedAtRef.current;
+      stepStartRef.current += d;
+      const cur = steps[idxRef.current];
+      if (cur && startedRef.current[cur.id]) startedRef.current[cur.id] += d;
       setRunning(true);
     }
     try {
@@ -993,8 +1204,9 @@ function RunView({
   };
   const exit = () => {
     if (!loggedRef.current) {
+      const cur = steps[idxRef.current];
       const el = Math.max(0, nowBase() - stepStartRef.current);
-      actualsRef.current[idxRef.current] = Math.max(actualsRef.current[idxRef.current] || 0, el);
+      if (cur) actualsRef.current[cur.id] = Math.max(actualsRef.current[cur.id] || 0, el);
       const e = buildEntry(false);
       if (e.actualSec >= 1) {
         loggedRef.current = true;
@@ -1010,15 +1222,19 @@ function RunView({
   const restart = () => {
     runStartRef.current = Date.now();
     stepStartRef.current = Date.now();
-    actualsRef.current = steps.map(() => 0);
+    actualsRef.current = {};
     skipsRef.current = {};
     autoRef.current = {};
     checksRef.current = {};
+    startedRef.current = {};
+    arrivedRef.current = {};
+    readyAnnRef.current = {};
     setChecks({});
     loggedRef.current = false;
-    warnRef.current = -1;
-    spokeRef.current = -1;
-    saidRef.current = -1;
+    warnRef.current = null;
+    spokeRef.current = null;
+    saidRef.current = null;
+    gateRef.current = null;
     idxRef.current = 0;
     lastSaveRef.current = 0;
     setIdx(0);
@@ -1027,10 +1243,12 @@ function RunView({
     setRunning(true);
   };
   const toggleCheck = cid => {
+    const st = steps[idx];
+    if (!st) return;
     const m = Object.assign({}, checksRef.current);
-    const cur = Object.assign({}, m[idx] || {});
+    const cur = Object.assign({}, m[st.id] || {});
     cur[cid] = !cur[cid];
-    m[idx] = cur;
+    m[st.id] = cur;
     checksRef.current = m;
     setChecks(m);
     persist(true);
@@ -1052,7 +1270,7 @@ function RunView({
       stop: () => exit()
     });
     return () => setMediaActions({});
-  }, [idx, running, finished]);
+  }, [idx, running, finished, steps]);
   if (finished) {
     return /*#__PURE__*/React.createElement("div", {
       className: "run"
@@ -1073,14 +1291,25 @@ function RunView({
   const step = steps[idx];
   const man = isManual(step);
   const plannedMs = step.seconds * 1000;
-  const remaining = plannedMs - elapsed;
-  const over = man && remaining < 0;
-  const frac = man ? Math.max(0, Math.min(1, elapsed / plannedMs)) : Math.max(0, Math.min(1, remaining / plannedMs));
+  const waiting = elapsed < 0;
+  const waitLeft = waiting ? -elapsed : 0;
+  const waitTotal = (step.dep && step.dep.sec ? step.dep.sec : 60) * 1000;
+  const remaining = plannedMs - Math.max(0, elapsed);
+  const over = man && !waiting && remaining < 0;
+  const frac = waiting ? Math.max(0, Math.min(1, waitLeft / waitTotal)) : man ? Math.max(0, Math.min(1, elapsed / plannedMs)) : Math.max(0, Math.min(1, remaining / plannedMs));
   const R = 140,
     C = 2 * Math.PI * R;
-  const ringColor = over ? '#c4402f' : step.color;
-  const futureMs = steps.slice(idx + 1).reduce((a, x) => a + x.seconds * 1000, 0);
-  const projEnd = Date.now() + Math.max(0, remaining) + futureMs;
+  const ringColor = waiting ? '#2e4b6b' : over ? '#c4402f' : step.color;
+
+  /* Walk the remainder forward, letting any prerequisite push the cursor out,
+     so the estimate reflects waits that outlast the work queued before them. */
+  let cursor = waiting ? Date.now() + waitLeft + plannedMs : Date.now() + Math.max(0, remaining);
+  for (let j = idx + 1; j < steps.length; j++) {
+    const g = readyAt(steps[j]);
+    if (g && g > cursor) cursor = g;
+    cursor += steps[j].seconds * 1000;
+  }
+  const projEnd = cursor;
   const planEnd = runStartRef.current + total * 1000;
   let targetMs = null;
   if (routine.targetEnd && /^\d{1,2}:\d{2}$/.test(routine.targetEnd)) {
@@ -1093,7 +1322,12 @@ function RunView({
   const delta = projEnd - (targetMs || planEnd);
   const dCls = delta > 60000 ? 'late' : delta < -60000 ? 'early' : '';
   const curChecks = step.checks || [];
-  const checkState = checks[idx] || {};
+  const checkState = checks[step.id] || {};
+  const pendingReady = steps.map((x, j) => ({
+    x: x,
+    j: j,
+    g: readyAt(x)
+  })).filter(o => o.j > idx && o.g && o.g > Date.now());
   return /*#__PURE__*/React.createElement("div", {
     className: "run"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1157,7 +1391,11 @@ function RunView({
     style: {
       color: ringColor
     }
-  }, man ? mmss(elapsed) : mmss(remaining)), man ? /*#__PURE__*/React.createElement("div", {
+  }, waiting ? mmss(waitLeft) : man ? mmss(elapsed) : mmss(remaining)), waiting ? /*#__PURE__*/React.createElement("div", {
+    className: "next-line"
+  }, /*#__PURE__*/React.createElement("b", {
+    className: "wt"
+  }, depSourceName(step)), " の準備まで") : man ? /*#__PURE__*/React.createElement("div", {
     className: "next-line"
   }, over ? /*#__PURE__*/React.createElement("b", {
     className: "ov"
@@ -1165,7 +1403,19 @@ function RunView({
     className: "next-line"
   }, idx < steps.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "次 · ", /*#__PURE__*/React.createElement("b", null, steps[idx + 1].name || 'ステップ ' + (idx + 2))) : '最後のステップ'))), bgOn && /*#__PURE__*/React.createElement("div", {
     className: "bg-tag"
-  }, /*#__PURE__*/React.createElement("b", null, "●"), " 裏でも進行中 — 他のアプリに移って大丈夫です")), curChecks.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("b", null, "●"), " 裏でも進行中 — 他のアプリに移って大丈夫です")), pendingReady.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "pending-strip"
+  }, pendingReady.map(o => /*#__PURE__*/React.createElement("span", {
+    className: "pend",
+    key: o.x.id
+  }, /*#__PURE__*/React.createElement("b", null, "⏳"), o.x.name || 'ステップ ' + (o.j + 1), " ", mmss(o.g - Date.now())))), waiting && /*#__PURE__*/React.createElement("div", {
+    className: "wait-box"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "wb-msg"
+  }, depSourceName(step), " の準備ができるまで待っています。"), idx < steps.length - 1 && /*#__PURE__*/React.createElement("button", {
+    className: "wb-btn",
+    onClick: defer
+  }, "先に「", steps[idx + 1].name || '次のステップ', "」をやる")), !waiting && curChecks.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "chk-list"
   }, curChecks.map(c => {
     const on = !!checkState[c.id];
@@ -1176,7 +1426,7 @@ function RunView({
     }, /*#__PURE__*/React.createElement("span", {
       className: "box"
     }, on ? '✓' : ''), c.text);
-  })), man && /*#__PURE__*/React.createElement("button", {
+  })), !waiting && man && /*#__PURE__*/React.createElement("button", {
     className: "done-step",
     onClick: next
   }, "✓ 完了して次へ"), /*#__PURE__*/React.createElement("div", {
@@ -1242,23 +1492,41 @@ function SettingsView({
         const arr = Array.isArray(data) ? data : data.routines || [];
         const hasLogs = data && Array.isArray(data.logs) && data.logs.length;
         const mode = confirm('既存のルーチンを置き換えますか？\n\n［OK］置き換え　／　［キャンセル］追加読み込み') ? 'replace' : 'append';
-        const clean = arr.filter(r => r && Array.isArray(r.steps)).map(r => ({
-          id: uid(),
-          name: String(r.name || '読み込み').slice(0, 60),
-          targetEnd: r.targetEnd || null,
-          steps: r.steps.map(s => ({
+        const clean = arr.filter(r => r && Array.isArray(r.steps)).map(r => {
+          const map = {};
+          const steps = r.steps.map(s => {
+            const nid = uid();
+            if (s.id) map[s.id] = nid;
+            return {
+              id: nid,
+              name: String(s.name || '').slice(0, 60),
+              seconds: Math.max(1, parseInt(s.seconds, 10) || 60),
+              color: s.color || '#c4402f',
+              mode: s.mode === 'manual' ? 'manual' : 'timer',
+              days: Array.isArray(s.days) && s.days.length && s.days.length < 7 ? s.days : null,
+              dep: s.dep && s.dep.after ? {
+                after: s.dep.after,
+                sec: Math.max(0, parseInt(s.dep.sec, 10) || 0)
+              } : null,
+              checks: Array.isArray(s.checks) ? s.checks.filter(c => c && c.text).map(c => ({
+                id: uid(),
+                text: String(c.text).slice(0, 60)
+              })) : []
+            };
+          });
+          steps.forEach(s => {
+            if (s.dep) s.dep = map[s.dep.after] ? {
+              after: map[s.dep.after],
+              sec: s.dep.sec
+            } : null;
+          });
+          return {
             id: uid(),
-            name: String(s.name || '').slice(0, 60),
-            seconds: Math.max(1, parseInt(s.seconds, 10) || 60),
-            color: s.color || '#c4402f',
-            mode: s.mode === 'manual' ? 'manual' : 'timer',
-            days: Array.isArray(s.days) && s.days.length && s.days.length < 7 ? s.days : null,
-            checks: Array.isArray(s.checks) ? s.checks.filter(c => c && c.text).map(c => ({
-              id: uid(),
-              text: String(c.text).slice(0, 60)
-            })) : []
-          }))
-        })).filter(r => r.steps.length);
+            name: String(r.name || '読み込み').slice(0, 60),
+            targetEnd: r.targetEnd || null,
+            steps: steps
+          };
+        }).filter(r => r.steps.length);
         if (!clean.length) {
           alert('読み込めるルーチンが見つかりませんでした。');
           return;
@@ -1487,7 +1755,8 @@ function LogView({
           const tag = s.auto ? ' `[時間切れ]`' : s.mode === 'manual' ? ' `[完了ボタン]`' : ' `[手押し]`';
           const val = s.skipped ? 'スキップ' : s.actualSec ? fmtLong(s.actualSec) + tag : '—';
           const ck = s.checkTotal ? '　☑' + s.checkDone + '/' + s.checkTotal : '';
-          md += '    - ' + (s.name || '（無題）') + '　' + fmtLong(s.plannedSec) + ' / ' + val + ck + '\n';
+          const wt = s.waitSec ? '　⏳待ち ' + fmtLong(s.waitSec) : s.idleSec ? '　💤放置 ' + fmtLong(s.idleSec) : '';
+          md += '    - ' + (s.name || '（無題）') + '　' + fmtLong(s.plannedSec) + ' / ' + val + ck + wt + '\n';
         });
       });
     });

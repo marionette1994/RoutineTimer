@@ -1,5 +1,5 @@
 /* 律帖 service worker — the app must start on a cold morning with no network. */
-const CACHE = 'ritcho-v5';
+const CACHE = 'ritcho-v6';
 const CORE = [
   './', './index.html', './app.js', './manifest.json', './icon.svg',
   './vendor/react.production.min.js',
