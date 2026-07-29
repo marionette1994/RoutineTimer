@@ -4,16 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#efe7d6" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
 <title>律帖 — ルーチンタイマー</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23efe7d6'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='%23c4402f' font-family='serif'%3E律%3C/text%3E%3C/svg%3E" />
-<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22%E5%BE%8B%E5%B8%96%22%2C%22short_name%22%3A%22%E5%BE%8B%E5%B8%96%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23efe7d6%22%2C%22theme_color%22%3A%22%23efe7d6%22%2C%22start_url%22%3A%22.%22%7D" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
   :root{
     --washi:#efe7d6; --washi-card:#f6f0e3;
@@ -35,6 +33,7 @@
     min-height:100dvh; -webkit-font-smoothing:antialiased;
   }
   #root{max-width:560px;margin:0 auto;padding:0 18px calc(env(safe-area-inset-bottom) + 28px);min-height:100dvh;}
+  .dim{color:var(--sumi-faint);} .sm{font-size:11.5px;}
 
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:26px 4px 20px;}
   .brand{display:flex;align-items:baseline;gap:12px;}
@@ -42,46 +41,56 @@
   .brand .seal{font-family:var(--mincho);font-size:12px;color:#fff;background:var(--shu);width:26px;height:26px;border-radius:6px;display:grid;place-items:center;transform:translateY(-3px);box-shadow:0 2px 6px rgba(158,43,30,.35);}
   .toolbtns{display:flex;gap:8px;}
   .tool-chip{font-family:var(--gothic);font-size:12.5px;letter-spacing:.06em;color:var(--sumi-soft);background:transparent;border:1px solid var(--line-strong);border-radius:9px;padding:7px 12px;cursor:pointer;}
-  .tool-chip:hover{background:rgba(34,31,27,.04);}
 
   .btn{font-family:var(--gothic);font-size:14px;border:none;cursor:pointer;border-radius:10px;padding:10px 16px;transition:transform .08s,background .15s,opacity .15s;}
   .btn:active{transform:translateY(1px);}
   .btn:disabled{opacity:.4;cursor:default;}
   .btn-ghost{background:transparent;color:var(--sumi-soft);border:1px solid var(--line-strong);}
-  .btn-ghost:hover{background:rgba(34,31,27,.04);}
   .btn-shu{background:var(--shu);color:#fff;box-shadow:0 3px 10px rgba(158,43,30,.28);}
-  .btn-shu:hover{background:var(--shu-deep);}
   .icon-btn{background:transparent;border:none;cursor:pointer;color:var(--sumi-soft);padding:8px;border-radius:8px;display:grid;place-items:center;font-size:16px;}
-  .icon-btn:hover{background:rgba(34,31,27,.05);color:var(--sumi);}
   .icon-btn:disabled{opacity:.35;}
+
+  .resume-bar{display:flex;align-items:center;gap:12px;background:var(--washi-card);border:1px solid var(--shu);border-left:4px solid var(--shu);border-radius:14px;padding:14px 14px 14px 16px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .resume-bar .rb-t{font-size:12px;color:var(--shu);letter-spacing:.1em;font-weight:700;}
+  .resume-bar .rb-s{font-family:var(--mincho);font-size:17px;margin-top:3px;}
+  .resume-bar .rb-m{font-size:11.5px;color:var(--sumi-faint);margin-top:3px;}
+  .resume-bar .rb-btns{margin-left:auto;display:flex;gap:8px;flex:none;}
+  .resume-bar button{font-family:var(--gothic);font-size:13px;border-radius:9px;padding:9px 13px;cursor:pointer;border:1px solid var(--line-strong);background:transparent;color:var(--sumi-soft);}
+  .resume-bar button.rb-go{background:var(--shu);color:#fff;border-color:var(--shu);font-weight:700;}
+
+  .warn-bar{display:flex;align-items:flex-start;gap:11px;background:rgba(214,162,43,.13);border:1px solid rgba(214,162,43,.5);border-radius:13px;padding:12px 14px;margin-bottom:16px;cursor:pointer;}
+  .warn-bar .wb-i{flex:none;width:20px;height:20px;border-radius:50%;background:#b8860b;color:#fff;font-size:13px;font-weight:700;display:grid;place-items:center;margin-top:1px;}
+  .warn-bar .wb-t{font-size:13.5px;font-weight:700;color:#7a5c10;}
+  .warn-bar .wb-s{font-size:11.5px;color:var(--sumi-faint);margin-top:3px;line-height:1.5;}
 
   .list{display:flex;flex-direction:column;gap:14px;}
   .card{background:var(--washi-card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;position:relative;}
   .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--shu));opacity:.85;}
   .card-main{padding:18px 18px 16px 22px;cursor:pointer;}
   .card-name{font-family:var(--mincho);font-size:20px;font-weight:500;margin:0 0 8px;letter-spacing:.03em;}
-  .card-meta{display:flex;gap:16px;color:var(--sumi-faint);font-size:12.5px;}
+  .card-meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--sumi-faint);font-size:12.5px;}
   .card-meta b{color:var(--sumi-soft);font-weight:600;font-variant-numeric:tabular-nums;}
   .card-foot{display:flex;border-top:1px solid var(--line);}
   .card-foot button{flex:1;background:transparent;border:none;padding:13px;font-family:var(--gothic);font-size:14px;cursor:pointer;color:var(--sumi-soft);}
-  .card-foot button:hover{background:rgba(34,31,27,.04);}
   .card-foot button:disabled{opacity:.35;}
   .card-foot .start{color:var(--shu);font-weight:700;border-left:1px solid var(--line);letter-spacing:.06em;}
 
   .empty{text-align:center;padding:70px 20px;color:var(--sumi-faint);}
   .empty .big{font-family:var(--mincho);font-size:44px;color:var(--line-strong);margin-bottom:14px;}
   .add-full{width:100%;padding:15px;border:1.5px dashed var(--line-strong);background:transparent;border-radius:14px;color:var(--sumi-soft);font-family:var(--gothic);font-size:15px;cursor:pointer;letter-spacing:.08em;margin-top:22px;}
-  .add-full:hover{border-color:var(--shu);color:var(--shu);}
 
   .sub-head{display:flex;align-items:center;gap:10px;padding:22px 2px 14px;}
   .sub-head h2{font-family:var(--mincho);font-size:20px;font-weight:500;margin:0;flex:1;letter-spacing:.06em;}
-
   .field{margin:8px 0 20px;}
   .field label{display:block;font-size:11.5px;color:var(--sumi-faint);letter-spacing:.14em;margin:0 0 7px 2px;}
   .name-input{width:100%;font-family:var(--mincho);font-size:22px;font-weight:500;color:var(--sumi);background:transparent;border:none;border-bottom:1.5px solid var(--line-strong);padding:6px 2px 10px;}
   .name-input:focus{outline:none;border-bottom-color:var(--shu);}
+  .tgt-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .tgt-row input[type=time]{font-family:var(--mincho);font-size:18px;color:var(--sumi);background:var(--washi-card);border:1px solid var(--line-strong);border-radius:9px;padding:8px 10px;}
+
   .steps{display:flex;flex-direction:column;gap:10px;}
-  .step-row{background:var(--washi-card);border:1px solid var(--line);border-radius:13px;padding:10px 10px 10px 8px;display:flex;align-items:center;gap:8px;}
+  .step-box{background:var(--washi-card);border:1px solid var(--line);border-radius:13px;overflow:hidden;}
+  .step-row{padding:10px 10px 8px 8px;display:flex;align-items:center;gap:8px;}
   .step-idx{font-family:var(--mincho);font-size:13px;color:var(--sumi-faint);width:20px;text-align:center;font-variant-numeric:tabular-nums;}
   .dot{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.7);box-shadow:0 0 0 1px var(--line-strong);cursor:pointer;flex:none;}
   .step-name-in{flex:1;min-width:0;font-family:var(--gothic);font-size:15px;color:var(--sumi);background:transparent;border:none;padding:6px 2px;}
@@ -96,6 +105,27 @@
   .del-btn:hover{color:var(--shu)!important;}
   .palette{position:absolute;background:var(--washi-card);border:1px solid var(--line-strong);border-radius:12px;padding:9px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;box-shadow:var(--shadow);z-index:20;}
   .palette .dot{width:22px;height:22px;}
+
+  .step-sub{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:0 12px 10px 38px;}
+  .det-toggle{background:transparent;border:none;color:var(--sumi-faint);font-family:var(--gothic);font-size:11.5px;cursor:pointer;padding:2px 0;text-decoration:underline;text-underline-offset:3px;}
+  .det-toggle.on{color:var(--shu);}
+  .badge{font-size:10.5px;background:rgba(34,31,27,.07);color:var(--sumi-soft);padding:3px 8px;border-radius:20px;}
+  .step-det{border-top:1px solid var(--line);background:rgba(34,31,27,.025);padding:13px 14px 15px;}
+  .det-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+  .det-col{display:flex;flex-direction:column;gap:7px;margin-top:12px;}
+  .det-l{font-size:11px;color:var(--sumi-faint);letter-spacing:.12em;width:38px;flex:none;}
+  .det-hint{font-size:11px;color:var(--sumi-faint);margin:0 0 12px 48px;line-height:1.5;}
+  .seg-btns{display:flex;gap:6px;}
+  .seg-btns button{font-family:var(--gothic);font-size:12.5px;color:var(--sumi-soft);background:transparent;border:1px solid var(--line-strong);border-radius:8px;padding:7px 12px;cursor:pointer;}
+  .seg-btns button.on{background:var(--sumi);color:var(--washi);border-color:var(--sumi);font-weight:700;}
+  .dow{display:flex;gap:4px;}
+  .dow button{width:29px;height:29px;border-radius:50%;border:1px solid var(--line-strong);background:transparent;color:var(--sumi-faint);font-family:var(--gothic);font-size:12px;cursor:pointer;}
+  .dow button.on{background:var(--shu);color:#fff;border-color:var(--shu);font-weight:700;}
+  .chk-row{display:flex;align-items:center;gap:6px;}
+  .chk-row input{flex:1;min-width:0;font-family:var(--gothic);font-size:14px;color:var(--sumi);background:var(--washi-card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .chk-row input:focus{outline:none;border-color:var(--shu);}
+  .chk-add{background:transparent;border:1px dashed var(--line-strong);border-radius:8px;color:var(--sumi-faint);font-family:var(--gothic);font-size:12.5px;padding:8px;cursor:pointer;}
+
   .ed-foot{display:flex;gap:10px;margin-top:24px;}
   .ed-foot .btn{flex:1;padding:14px;font-size:15px;}
   .total-line{text-align:center;color:var(--sumi-faint);font-size:12.5px;margin-top:18px;letter-spacing:.1em;}
@@ -107,25 +137,39 @@
   .segbar{display:flex;gap:3px;height:6px;margin:14px 2px 6px;}
   .seg{border-radius:3px;opacity:.28;transition:opacity .3s;}
   .seg.done{opacity:.6;} .seg.cur{opacity:1;}
-  .ring-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;}
-  .ring{position:relative;width:min(78vw,320px);height:min(78vw,320px);}
+  .eta{text-align:center;font-size:12.5px;color:var(--sumi-faint);padding:6px 2px 0;letter-spacing:.04em;}
+  .eta b{font-family:var(--mincho);font-size:16px;color:var(--sumi-soft);font-variant-numeric:tabular-nums;}
+  .eta .d{margin-left:9px;padding:2px 9px;border-radius:20px;background:rgba(34,31,27,.06);font-size:12px;}
+  .eta .d.late{background:rgba(196,64,47,.14);color:var(--shu-deep);font-weight:700;}
+  .eta .d.early{background:rgba(95,115,70,.16);color:#4f632f;font-weight:700;}
+  .ring-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:300px;}
+  .ring{position:relative;width:min(72vw,300px);height:min(72vw,300px);}
   .ring svg{transform:rotate(-90deg);width:100%;height:100%;}
   .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-  .cur-name{font-family:var(--mincho);font-size:23px;font-weight:500;text-align:center;padding:0 20px;}
-  .cur-time{font-family:var(--mincho);font-size:64px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.05;margin-top:4px;}
-  .next-line{color:var(--sumi-faint);font-size:13.5px;margin-top:2px;min-height:20px;}
+  .cur-name{font-family:var(--mincho);font-size:22px;font-weight:500;text-align:center;padding:0 22px;}
+  .cur-time{font-family:var(--mincho);font-size:60px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.05;margin-top:4px;}
+  .next-line{color:var(--sumi-faint);font-size:13px;margin-top:2px;min-height:20px;text-align:center;padding:0 18px;}
   .next-line b{color:var(--sumi-soft);font-weight:600;}
-  .paused-tag{position:absolute;top:calc(50% - 132px);font-family:var(--mincho);font-size:12px;letter-spacing:.4em;color:var(--shu);}
-  .bg-tag{position:absolute;bottom:6px;font-size:11px;color:var(--sumi-faint);letter-spacing:.08em;}
+  .next-line b.ov{color:var(--shu);}
+  .paused-tag{position:absolute;top:8px;font-family:var(--mincho);font-size:12px;letter-spacing:.4em;color:var(--shu);}
+  .bg-tag{position:absolute;bottom:2px;font-size:11px;color:var(--sumi-faint);letter-spacing:.06em;}
   .bg-tag b{color:#4f632f;font-weight:700;}
-  .controls{display:flex;align-items:center;justify-content:center;gap:22px;padding:22px 0 8px;}
-  .cbtn{background:transparent;border:1px solid var(--line-strong);color:var(--sumi-soft);width:58px;height:58px;border-radius:50%;display:grid;place-items:center;cursor:pointer;transition:transform .08s,background .15s;font-size:18px;}
+
+  .chk-list{display:flex;flex-direction:column;gap:7px;margin:6px 0 4px;}
+  .chk-item{display:flex;align-items:center;gap:10px;text-align:left;background:var(--washi-card);border:1px solid var(--line);border-radius:11px;padding:12px 13px;font-family:var(--gothic);font-size:15px;color:var(--sumi);cursor:pointer;}
+  .chk-item .box{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--line-strong);display:grid;place-items:center;font-size:13px;color:#fff;}
+  .chk-item.on{border-color:#5f7346;background:rgba(95,115,70,.08);color:var(--sumi-faint);text-decoration:line-through;}
+  .chk-item.on .box{background:#5f7346;border-color:#5f7346;}
+
+  .done-step{width:100%;margin:10px 0 2px;padding:16px;border:none;border-radius:14px;background:var(--shu);color:#fff;font-family:var(--gothic);font-size:16px;font-weight:700;letter-spacing:.08em;cursor:pointer;box-shadow:0 4px 14px rgba(158,43,30,.3);}
+  .done-step:active{transform:translateY(1px);}
+
+  .controls{display:flex;align-items:center;justify-content:center;gap:22px;padding:16px 0 6px;}
+  .cbtn{background:transparent;border:1px solid var(--line-strong);color:var(--sumi-soft);width:56px;height:56px;border-radius:50%;display:grid;place-items:center;cursor:pointer;font-size:18px;}
   .cbtn:active{transform:scale(.94);}
-  .cbtn.main{width:76px;height:76px;background:var(--shu);border:none;color:#fff;box-shadow:0 6px 18px rgba(158,43,30,.35);font-size:22px;}
-  .cbtn.main:hover{background:var(--shu-deep);}
+  .cbtn.main{width:72px;height:72px;background:var(--shu);border:none;color:#fff;box-shadow:0 6px 18px rgba(158,43,30,.35);font-size:22px;}
   .skip-wrap{display:flex;justify-content:center;padding:2px 0 6px;}
   .skip-btn{background:transparent;border:none;color:var(--sumi-faint);font-family:var(--gothic);font-size:13px;letter-spacing:.06em;cursor:pointer;padding:8px 14px;border-radius:8px;}
-  .skip-btn:hover{background:rgba(34,31,27,.05);color:var(--shu);}
 
   .done-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
   .done-seal{font-family:var(--mincho);color:#fff;background:var(--shu);width:96px;height:96px;border-radius:24px;display:grid;place-items:center;font-size:52px;box-shadow:0 10px 30px rgba(158,43,30,.35);margin-bottom:18px;transform:rotate(-4deg);}
@@ -147,19 +191,22 @@
   .sw input:checked ~ .track{background:var(--shu);}
   .sw input:checked ~ .knob{transform:translateX(18px);}
   .perm-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 0;}
-  .perm-state{font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(34,31,27,.07);color:var(--sumi-faint);}
+  .perm-state{font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(34,31,27,.07);color:var(--sumi-faint);flex:none;}
   .perm-state.ok{background:rgba(95,115,70,.16);color:#4f632f;font-weight:700;}
+  .perm-state.warn{background:rgba(214,162,43,.22);color:#7a5c10;font-weight:700;}
   .backup-row{display:flex;gap:10px;padding:14px 0;}
   .backup-row .btn{flex:1;}
   .hint{font-size:11.5px;color:var(--sumi-faint);line-height:1.65;padding:2px 2px 12px;}
 
   .range-row{display:flex;align-items:center;gap:8px;margin:2px 0 10px;}
   .range-row input[type=date]{flex:1;font-family:var(--gothic);font-size:14px;color:var(--sumi);background:var(--washi-card);border:1px solid var(--line-strong);border-radius:9px;padding:9px 10px;}
-  .range-row span{color:var(--sumi-faint);}
   .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
   .chip{font-size:12.5px;color:var(--sumi-soft);background:transparent;border:1px solid var(--line-strong);border-radius:20px;padding:6px 13px;cursor:pointer;}
-  .exp-row{display:flex;gap:10px;margin:4px 0 18px;}
+  .exp-row{display:flex;gap:10px;margin:4px 0 14px;}
   .exp-row .btn{flex:1;}
+  .mode-row{display:flex;gap:7px;margin:0 0 14px;}
+  .mode-row button{flex:1;font-size:13px;color:var(--sumi-soft);background:transparent;border:1px solid var(--line-strong);border-radius:9px;padding:9px;cursor:pointer;}
+  .mode-row button.on{background:var(--sumi);color:var(--washi);border-color:var(--sumi);font-weight:700;}
   .log-summary{text-align:center;color:var(--sumi-faint);font-size:12.5px;margin-bottom:16px;}
   .log-summary b{font-family:var(--mincho);color:var(--sumi-soft);font-size:15px;}
   .log-group{margin-bottom:18px;}
@@ -173,632 +220,34 @@
   .badge-ok{background:rgba(95,115,70,.16);color:#4f632f;}
   .badge-cut{background:rgba(34,31,27,.08);color:var(--sumi-faint);}
   .log-x{background:transparent;border:none;color:var(--sumi-faint);cursor:pointer;font-size:15px;padding:4px;flex:none;}
-  .log-x:hover{color:var(--shu);}
   .clear-all{display:block;margin:8px auto 0;background:transparent;border:none;color:var(--sumi-faint);font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+
+  .stat-sel{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+  .stat-sel button{font-size:12.5px;color:var(--sumi-soft);background:transparent;border:1px solid var(--line-strong);border-radius:20px;padding:6px 13px;cursor:pointer;}
+  .stat-sel button.on{background:var(--shu);color:#fff;border-color:var(--shu);}
+  .stat-row{background:var(--washi-card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:8px;}
+  .stat-h{display:flex;align-items:baseline;gap:8px;margin-bottom:7px;}
+  .stat-h .nm{font-size:14.5px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .stat-h .n{font-size:11px;color:var(--sumi-faint);flex:none;}
+  .stat-b{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--sumi-faint);font-variant-numeric:tabular-nums;}
+  .stat-b .pl{color:var(--sumi-soft);}
+  .stat-b .ar{color:var(--line-strong);}
+  .stat-b .md{font-family:var(--mincho);font-size:16px;color:var(--sumi);}
+  .stat-b .df{padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:700;}
+  .df.over{background:rgba(196,64,47,.14);color:var(--shu-deep);}
+  .df.under{background:rgba(95,115,70,.16);color:#4f632f;}
+  .df.same{background:rgba(34,31,27,.06);color:var(--sumi-faint);}
+  .stat-b .sk{margin-left:auto;font-size:11px;text-align:right;}
+  .apply-box{margin:16px 0 8px;}
+  .apply-box .btn{width:100%;padding:14px;font-size:14.5px;}
+
   @media (prefers-reduced-motion: reduce){*{transition:none!important;}}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const {useState,useEffect,useRef}=React;
-
-const RKEY='ritcho-routines-v1', LKEY='ritcho-logs-v1', SKEY='ritcho-settings-v1';
-const load=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
-const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
-
-const COLORS=[
-  {n:'朱',c:'#c4402f'},{n:'藍',c:'#2e4b6b'},{n:'苔',c:'#5f7346'},{n:'山吹',c:'#d6a22b'},
-  {n:'鳶',c:'#7a4b3a'},{n:'藤',c:'#7a6ba6'},{n:'鼠',c:'#706c64'},{n:'松',c:'#3d5c4a'}
-];
-const uid=()=>Math.random().toString(36).slice(2,9);
-const WD=['日','月','火','水','木','金','土'];
-
-const seed=[
-  {id:uid(),name:'朝のルーチン',steps:[
-    {id:uid(),name:'白湯を飲む',seconds:60,color:'#d6a22b'},
-    {id:uid(),name:'ストレッチ',seconds:180,color:'#5f7346'},
-    {id:uid(),name:'瞑想',seconds:300,color:'#2e4b6b'},
-    {id:uid(),name:'今日の三つを書く',seconds:120,color:'#c4402f'}]},
-  {id:uid(),name:'集中：ポモドーロ',steps:[
-    {id:uid(),name:'集中',seconds:1500,color:'#c4402f'},
-    {id:uid(),name:'休憩',seconds:300,color:'#5f7346'}]},
-];
-
-let SETTINGS={sound:true,speech:true,speakStart:true,vibrate:true,wake:true,background:true,notify:true};
-
-/* ---------- background keep-alive ---------- */
-/* Chrome throttles timers in hidden tabs, but exempts pages that are playing
-   audio. A looping, essentially inaudible track keeps our clock running. */
-function makeQuietWav(){
-  const sr=8000, len=sr*2, bytes=44+len, b=new ArrayBuffer(bytes), v=new DataView(b);
-  const put=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
-  put(0,'RIFF');v.setUint32(4,bytes-8,true);put(8,'WAVE');put(12,'fmt ');
-  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
-  v.setUint32(24,sr,true);v.setUint32(28,sr,true);v.setUint16(32,1,true);v.setUint16(34,8,true);
-  put(36,'data');v.setUint32(40,len,true);
-  for(let i=0;i<len;i++)v.setUint8(44+i,128+(i%2));
-  let s='';const u=new Uint8Array(b);
-  for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);
-  return 'data:audio/wav;base64,'+btoa(s);
-}
-let keepEl=null;
-const bg={
-  start(){
-    if(!SETTINGS.background)return;
-    try{
-      if(!keepEl){keepEl=document.createElement('audio');keepEl.src=makeQuietWav();keepEl.loop=true;keepEl.volume=.02;keepEl.setAttribute('playsinline','');document.body.appendChild(keepEl);}
-      keepEl.play().catch(()=>{});
-      if('mediaSession' in navigator){
-        navigator.mediaSession.metadata=new MediaMetadata({title:'律帖 実行中',artist:'ルーチンタイマー'});
-        navigator.mediaSession.playbackState='playing';
-      }
-    }catch(e){}
-  },
-  stop(){try{keepEl&&keepEl.pause();if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}catch(e){}}
-};
-
-let actx=null,wl=null;
-function chime(kind){
-  if(SETTINGS.sound){
-    try{
-      actx=actx||new (window.AudioContext||window.webkitAudioContext)();
-      if(actx.state==='suspended')actx.resume();
-      const t0=actx.currentTime;
-      const spec={step:{n:[[880,0],[1319,.11]],v:.22},done:{n:[[784,0],[988,.13],[1319,.26]],v:.22},warn:{n:[[620,0]],v:.13}}[kind]||{n:[[880,0]],v:.2};
-      spec.n.forEach(([f,dt])=>{
-        const o=actx.createOscillator(),g=actx.createGain();
-        o.type='sine';o.frequency.value=f;o.connect(g);g.connect(actx.destination);
-        g.gain.setValueAtTime(.0001,t0+dt);
-        g.gain.exponentialRampToValueAtTime(spec.v,t0+dt+.02);
-        g.gain.exponentialRampToValueAtTime(.0001,t0+dt+.32);
-        o.start(t0+dt);o.stop(t0+dt+.34);
-      });
-    }catch(e){}
-  }
-  if(SETTINGS.vibrate){try{const p={step:[70],done:[110,55,110,55,220],warn:[40]}[kind]||[60];navigator.vibrate&&navigator.vibrate(p);}catch(e){}}
-}
-function speak(text){
-  if(!SETTINGS.speech)return;
-  try{
-    if(!('speechSynthesis' in window))return;
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang='ja-JP';u.rate=1;u.volume=1;
-    window.speechSynthesis.cancel();window.speechSynthesis.speak(u);
-  }catch(e){}
-}
-let curNotif=null;
-function notify(title,body,alert){
-  if(!SETTINGS.notify)return;
-  try{
-    if(!('Notification' in window)||Notification.permission!=='granted')return;
-    if(curNotif){try{curNotif.close();}catch(e){}}
-    const n=new Notification(title,{body,tag:'ritcho-step',renotify:!!alert,silent:!alert,
-      icon:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23c4402f'/%3E%3Ctext x='50' y='70' font-size='62' text-anchor='middle' fill='%23fff' font-family='serif'%3E律%3C/text%3E%3C/svg%3E"});
-    n.onclick=()=>{window.focus();n.close();};
-    curNotif=n;
-  }catch(e){}
-}
-function clearNotif(){try{curNotif&&curNotif.close();}catch(e){}curNotif=null;}
-
-/* lock-screen / notification-shade media controls, so steps can be skipped
-   without returning to the browser */
-function setMedia(title,body){
-  if(!('mediaSession' in navigator))return;
-  try{navigator.mediaSession.metadata=new MediaMetadata({title,artist:body,album:'律帖'});}catch(e){}
-}
-function setMediaActions(h){
-  if(!('mediaSession' in navigator))return;
-  const set=(k,fn)=>{try{navigator.mediaSession.setActionHandler(k,fn||null);}catch(e){}};
-  set('nexttrack',h.next);set('previoustrack',h.prev);
-  set('play',h.play);set('pause',h.pause);set('stop',h.stop);
-}
-async function askNotify(){
-  try{if(!('Notification' in window))return 'unsupported';
-    if(Notification.permission==='granted')return 'granted';
-    return await Notification.requestPermission();}catch(e){return 'denied';}
-}
-async function keepAwake(){try{if(SETTINGS.wake&&'wakeLock' in navigator&&!wl){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>{wl=null;});}}catch(e){}}
-function releaseAwake(){try{wl&&wl.release();wl=null;}catch(e){}}
-
-const routineTotal=r=>r.steps.reduce((a,s)=>a+s.seconds,0);
-function fmtLong(sec){sec=Math.round(sec);const m=Math.floor(sec/60),s=sec%60;if(m&&s)return m+'分'+s+'秒';if(m)return m+'分';return s+'秒';}
-function mmss(ms){const t=Math.max(0,Math.ceil(ms/1000));const m=Math.floor(t/60),s=t%60;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
-function localDate(iso){const d=new Date(iso);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function hhmm(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-const todayStr=()=>localDate(new Date().toISOString());
-function shiftDay(str,n){const d=new Date(str+'T00:00:00');d.setDate(d.getDate()+n);return localDate(d.toISOString());}
-function download(name,text,mime){
-  try{
-    const blob=new Blob([text],{type:mime||'text/plain;charset=utf-8'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1500);
-  }catch(e){alert('書き出しに失敗しました');}
-}
-
-/* ================= LIST ================= */
-function ListView({routines,onRun,onEdit,onNew,onDelete,onOpenLog,onOpenSettings}){
-  return (
-    <div>
-      <div className="topbar">
-        <div className="brand"><h1>律帖</h1><span className="seal">律</span></div>
-        <div className="toolbtns">
-          <button className="tool-chip" onClick={onOpenLog}>記録</button>
-          <button className="tool-chip" onClick={onOpenSettings}>設定</button>
-        </div>
-      </div>
-      {routines.length===0 ? (
-        <div className="empty"><div className="big">空</div><p>まだルーチンがありません。<br/>下から最初の一つを作りましょう。</p></div>
-      ) : (
-        <div className="list">
-          {routines.map(r=>(
-            <div className="card" key={r.id} style={{'--accent':r.steps[0]?r.steps[0].color:'#c4402f'}}>
-              <div className="card-main" onClick={()=>onEdit(r.id)}>
-                <p className="card-name">{r.name||'（名称未設定）'}</p>
-                <div className="card-meta">
-                  <span><b>{r.steps.length}</b> ステップ</span>
-                  <span>計 <b>{fmtLong(routineTotal(r))}</b></span>
-                </div>
-              </div>
-              <div className="card-foot">
-                <button onClick={()=>onDelete(r.id)}>削除</button>
-                <button onClick={()=>onEdit(r.id)}>編集</button>
-                <button className="start" disabled={r.steps.length===0} onClick={()=>onRun(r.id)}>始める ▶</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <button className="add-full" onClick={onNew}>＋ ルーチンを作る</button>
-    </div>
-  );
-}
-
-/* ================= EDITOR ================= */
-function EditView({routine,onSave,onCancel}){
-  const [name,setName]=useState(routine.name);
-  const [steps,setSteps]=useState(routine.steps.length?routine.steps:[{id:uid(),name:'',seconds:60,color:'#c4402f'}]);
-  const [palFor,setPalFor]=useState(null);
-  const upd=(id,patch)=>setSteps(s=>s.map(x=>x.id===id?Object.assign({},x,patch):x));
-  const move=(i,dir)=>{const j=i+dir;if(j<0||j>=steps.length)return;const a=steps.slice();const t=a[i];a[i]=a[j];a[j]=t;setSteps(a);};
-  const del=id=>setSteps(s=>s.filter(x=>x.id!==id));
-  const add=()=>setSteps(s=>s.concat([{id:uid(),name:'',seconds:60,color:COLORS[s.length%COLORS.length].c}]));
-  const total=steps.reduce((a,s)=>a+s.seconds,0);
-  const setTime=(id,part,val)=>{
-    val=Math.max(0,Math.min(part==='m'?599:59,parseInt(val||'0',10)||0));
-    const cur=steps.find(s=>s.id===id);
-    const m=part==='m'?val:Math.floor(cur.seconds/60);
-    const sec=part==='s'?val:cur.seconds%60;
-    upd(id,{seconds:m*60+sec});
-  };
-  const doSave=()=>{
-    const clean=steps.map(s=>Object.assign({},s,{name:s.name.trim(),seconds:Math.max(1,s.seconds)}));
-    onSave(Object.assign({},routine,{name:name.trim()||'名称未設定',steps:clean}));
-  };
-  return (
-    <div onClick={()=>setPalFor(null)}>
-      <div className="sub-head"><button className="icon-btn" onClick={onCancel}>←</button><h2>ルーチンを編集</h2></div>
-      <div className="field"><label>ルーチン名</label>
-        <input className="name-input" value={name} onChange={e=>setName(e.target.value)} placeholder="例：朝のルーチン" /></div>
-      <div className="field"><label>ステップ</label>
-        <div className="steps">
-          {steps.map((s,i)=>(
-            <div className="step-row" key={s.id}>
-              <span className="step-idx">{i+1}</span>
-              <div style={{position:'relative'}}>
-                <span className="dot" style={{background:s.color}} onClick={e=>{e.stopPropagation();setPalFor(palFor===s.id?null:s.id);}} />
-                {palFor===s.id&&(
-                  <div className="palette" onClick={e=>e.stopPropagation()}>
-                    {COLORS.map(c=>(<span key={c.c} className="dot" title={c.n} style={{background:c.c}} onClick={()=>{upd(s.id,{color:c.c});setPalFor(null);}} />))}
-                  </div>)}
-              </div>
-              <input className="step-name-in" value={s.name} onChange={e=>upd(s.id,{name:e.target.value})} placeholder={'ステップ '+(i+1)} />
-              <div className="time-in">
-                <input type="number" inputMode="numeric" value={Math.floor(s.seconds/60)} onChange={e=>setTime(s.id,'m',e.target.value)} /><span>分</span>
-                <input type="number" inputMode="numeric" value={s.seconds%60} onChange={e=>setTime(s.id,'s',e.target.value)} /><span>秒</span>
-              </div>
-              <div className="row-tools">
-                <button onClick={()=>move(i,-1)} disabled={i===0}>▲</button>
-                <button onClick={()=>move(i,1)} disabled={i===steps.length-1}>▼</button>
-              </div>
-              <button className="icon-btn del-btn" onClick={()=>del(s.id)} disabled={steps.length===1}>×</button>
-            </div>
-          ))}
-        </div>
-        <button className="add-full" style={{marginTop:12}} onClick={add}>＋ ステップを追加</button>
-      </div>
-      <div className="total-line">合計 <b>{fmtLong(total)}</b>　/　{steps.length} ステップ</div>
-      <div className="ed-foot">
-        <button className="btn btn-ghost" onClick={onCancel}>キャンセル</button>
-        <button className="btn btn-shu" onClick={doSave}>保存</button>
-      </div>
-    </div>
-  );
-}
-
-/* ================= RUN ================= */
-/* The clock is absolute: elapsed = now - startAt. Nothing depends on ticks
-   arriving on time, so a frozen or throttled tab still resumes correctly. */
-function RunView({routine,onLog,onExit}){
-  const steps=routine.steps;
-  const total=steps.reduce((a,s)=>a+s.seconds,0);
-  const cum=[];steps.reduce((a,s)=>{const v=a+s.seconds*1000;cum.push(v);return v;},0);
-
-  const [idx,setIdx]=useState(0);
-  const [remaining,setRemaining]=useState(steps[0].seconds*1000);
-  const [running,setRunning]=useState(true);
-  const [finished,setFinished]=useState(false);
-  const [bgOn,setBgOn]=useState(false);
-
-  const startAtRef=useRef(Date.now());
-  const pausedAtRef=useRef(0);
-  const idxRef=useRef(0);
-  const runStartRef=useRef(Date.now());
-  const actualsRef=useRef(steps.map(()=>0));
-  const skipsRef=useRef({});
-  const loggedRef=useRef(false);
-  const warnRef=useRef(-1), spokeRef=useRef(-1), saidRef=useRef(-1);
-
-  const annTimer=useRef(null);
-
-  /* Everything that must happen when a step begins — however it began.
-     Manual skips run through here too, so the notification, the media
-     controls and the readout can never lag behind the actual step. */
-  const enterStep=(i,delay)=>{
-    saidRef.current=i;warnRef.current=-1;spokeRef.current=-1;
-    if(annTimer.current){clearTimeout(annTimer.current);annTimer.current=null;}
-    try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){}
-    const st=steps[i];
-    const nm=st.name||('ステップ '+(i+1));
-    const sub=fmtLong(st.seconds)+'　（'+(i+1)+'/'+steps.length+'）';
-    setMedia(nm,sub);
-    notify('▶ '+nm,sub,document.hidden);
-    if(SETTINGS.speakStart)annTimer.current=setTimeout(()=>speak(nm+'、'+fmtLong(st.seconds)),delay||120);
-  };
-
-  const stepStart=i=>i===0?0:cum[i-1];
-  const findIdx=el=>{for(let i=0;i<cum.length;i++)if(el<cum[i])return i;return steps.length;};
-
-  const buildEntry=completed=>{
-    const a=actualsRef.current.slice(0,steps.length);
-    const skips=steps.reduce((n,_,i)=>n+(skipsRef.current[i]?1:0),0);
-    return {id:uid(),routineId:routine.id,routineName:routine.name,
-      startISO:new Date(runStartRef.current).toISOString(),endISO:new Date().toISOString(),
-      plannedSec:total,actualSec:a.reduce((x,y)=>x+y,0),completed,skipped:skips,
-      stepsDone:a.filter((v,i)=>v>0&&!skipsRef.current[i]).length,stepsTotal:steps.length,
-      steps:steps.map((s,i)=>({name:s.name,plannedSec:s.seconds,actualSec:a[i]||0,skipped:!!skipsRef.current[i]}))};
-  };
-  const finish=()=>{
-    if(!loggedRef.current){loggedRef.current=true;onLog(buildEntry(true));}
-    setFinished(true);setRunning(false);releaseAwake();bg.stop();clearNotif();
-  };
-
-  /* main tick — recomputes from wall-clock every time */
-  useEffect(()=>{
-    if(!running||finished)return;
-    const tick=()=>{
-      const el=Date.now()-startAtRef.current;
-      const ni=findIdx(el);
-      if(ni>=steps.length){
-        for(let i=idxRef.current;i<steps.length;i++)actualsRef.current[i]=steps[i].seconds;
-        chime('done');
-        if(document.hidden)notify('律帖 — 完了',routine.name+' を終えました');
-        idxRef.current=steps.length-1;finish();return;
-      }
-      if(ni!==idxRef.current){
-        for(let i=idxRef.current;i<ni;i++)actualsRef.current[i]=steps[i].seconds;
-        idxRef.current=ni;setIdx(ni);
-        chime('step');
-        enterStep(ni,450);
-      } else if(saidRef.current!==ni){
-        enterStep(ni,120);
-      }
-      const left=cum[ni]-el;
-      const cur=steps[ni];
-      if(cur.seconds>=60&&spokeRef.current!==ni&&left<=30000){spokeRef.current=ni;speak('残り30秒です');}
-      if(cur.seconds>11&&warnRef.current!==ni&&left<=10000){warnRef.current=ni;chime('warn');}
-      setRemaining(left);
-    };
-    tick();
-    const t=setInterval(tick,200);
-    return ()=>clearInterval(t);
-  },[running,finished]);
-
-  /* keep-alive + wake lock, re-acquired whenever we come back to the foreground */
-  useEffect(()=>{
-    if(running&&!finished){keepAwake();bg.start();setBgOn(SETTINGS.background);}
-    else{releaseAwake();bg.stop();setBgOn(false);}
-  },[running,finished]);
-
-  useEffect(()=>{
-    const onVis=()=>{
-      if(document.hidden)return;
-      if(running&&!finished){keepAwake();bg.start();
-        try{if(actx&&actx.state==='suspended')actx.resume();}catch(e){}}
-    };
-    document.addEventListener('visibilitychange',onVis);
-    return ()=>document.removeEventListener('visibilitychange',onVis);
-  },[running,finished]);
-
-  useEffect(()=>()=>{releaseAwake();bg.stop();clearNotif();if(annTimer.current)clearTimeout(annTimer.current);try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){}},[]);
-
-  const jumpTo=n=>{
-    const base=running?Date.now():pausedAtRef.current;
-    const el=base-startAtRef.current;
-    actualsRef.current[idxRef.current]=Math.max(actualsRef.current[idxRef.current]||0,Math.round(Math.max(0,el-stepStart(idxRef.current))/1000));
-    startAtRef.current=base-stepStart(n);
-    idxRef.current=n;setIdx(n);setRemaining(steps[n].seconds*1000);
-    enterStep(n,120);
-  };
-  const next=()=>{ if(idx<steps.length-1)jumpTo(idx+1); else {actualsRef.current[idx]=Math.round((Date.now()-startAtRef.current-stepStart(idx))/1000);chime('done');finish();} };
-  /* Skip: drop this step entirely. Logged as skipped (0s), then move on. */
-  const skip=()=>{
-    const c=idxRef.current;
-    skipsRef.current[c]=true;actualsRef.current[c]=0;
-    if(c<steps.length-1){
-      const base=running?Date.now():pausedAtRef.current;
-      startAtRef.current=base-stepStart(c+1);
-      idxRef.current=c+1;setIdx(c+1);setRemaining(steps[c+1].seconds*1000);
-      enterStep(c+1,120);
-    }else{chime('done');finish();}
-  };
-  const prev=()=>{const el=Date.now()-startAtRef.current;(el-stepStart(idx)>1200)?jumpTo(idx):(idx>0&&jumpTo(idx-1));};
-  const toggle=()=>{
-    if(running){pausedAtRef.current=Date.now();setRunning(false);}
-    else{startAtRef.current+=Date.now()-pausedAtRef.current;setRunning(true);}
-    try{if('mediaSession' in navigator)navigator.mediaSession.playbackState=running?'paused':'playing';}catch(e){}
-  };
-  const exit=()=>{
-    if(!loggedRef.current){
-      const el=(running?Date.now():pausedAtRef.current)-startAtRef.current;
-      actualsRef.current[idxRef.current]=Math.max(actualsRef.current[idxRef.current]||0,Math.round(Math.max(0,el-stepStart(idxRef.current))/1000));
-      const e=buildEntry(false);
-      if(e.actualSec>=1){loggedRef.current=true;onLog(e);}
-    }
-    releaseAwake();bg.stop();clearNotif();onExit();
-  };
-  const restart=()=>{
-    runStartRef.current=Date.now();startAtRef.current=Date.now();
-    actualsRef.current=steps.map(()=>0);skipsRef.current={};loggedRef.current=false;
-    warnRef.current=-1;spokeRef.current=-1;saidRef.current=-1;idxRef.current=0;
-    setIdx(0);setRemaining(steps[0].seconds*1000);setFinished(false);setRunning(true);
-  };
-
-  /* Wire the same controls to the notification shade / lock screen, so a step
-     that finishes early can be skipped without coming back to the browser. */
-  useEffect(()=>{
-    if(finished){setMediaActions({});return;}
-    setMediaActions({
-      next:()=>next(),
-      prev:()=>prev(),
-      play:()=>{if(!running)toggle();},
-      pause:()=>{if(running)toggle();},
-      stop:()=>exit()
-    });
-    return ()=>setMediaActions({});
-  },[idx,running,finished]);
-
-  const step=steps[idx];
-  const frac=Math.max(0,Math.min(1,remaining/(step.seconds*1000)));
-  const R=140,C=2*Math.PI*R;
-
-  if(finished){
-    return (<div className="run"><div className="done-screen">
-      <div className="done-seal">了</div><h2>完了</h2>
-      <p>{routine.name}</p><p>{steps.length} ステップ　/　計 {fmtLong(total)}</p>
-      <div className="done-foot">
-        <button className="btn btn-ghost" onClick={onExit}>一覧へ</button>
-        <button className="btn btn-shu" onClick={restart}>もう一度</button>
-      </div></div></div>);
-  }
-  return (
-    <div className="run">
-      <div className="run-top">
-        <button className="icon-btn" onClick={exit}>✕</button>
-        <span className="run-count">{idx+1} / {steps.length}　{routine.name}</span>
-        <span style={{width:36}} />
-      </div>
-      <div className="segbar">
-        {steps.map((s,i)=>(<div key={s.id} className={'seg '+(i<idx?'done':i===idx?'cur':'')} style={{flex:s.seconds,background:s.color}} />))}
-      </div>
-      <div className="ring-wrap">
-        {!running&&<div className="paused-tag">一時停止中</div>}
-        <div className="ring">
-          <svg viewBox="0 0 300 300">
-            <circle cx="150" cy="150" r={R} fill="none" stroke="rgba(34,31,27,.09)" strokeWidth="10" />
-            <circle cx="150" cy="150" r={R} fill="none" stroke={step.color} strokeWidth="12" strokeLinecap="round"
-              strokeDasharray={C} strokeDashoffset={C*(1-frac)} style={{transition:'stroke-dashoffset .2s linear'}} />
-          </svg>
-          <div className="ring-center">
-            <div className="cur-name">{step.name||'ステップ '+(idx+1)}</div>
-            <div className="cur-time" style={{color:step.color}}>{mmss(remaining)}</div>
-            <div className="next-line">{idx<steps.length-1?<>次 · <b>{steps[idx+1].name||'ステップ '+(idx+2)}</b></>:'最後のステップ'}</div>
-          </div>
-        </div>
-        {bgOn&&<div className="bg-tag"><b>●</b> 裏でも進行中 — 他のアプリに移って大丈夫です</div>}
-      </div>
-      <div className="controls">
-        <button className="cbtn" onClick={prev}>⏮</button>
-        <button className="cbtn main" onClick={toggle}>{running?'❙❙':'▶'}</button>
-        <button className="cbtn" onClick={next}>⏭</button>
-      </div>
-      <div className="skip-wrap"><button className="skip-btn" onClick={skip}>⤼ このステップをスキップ</button></div>
-    </div>
-  );
-}
-
-/* ================= SETTINGS ================= */
-function SettingsView({settings,setSettings,routines,onImport,onBack}){
-  const fileRef=useRef(null);
-  const [perm,setPerm]=useState(('Notification' in window)?Notification.permission:'unsupported');
-  const toggle=k=>setSettings(s=>Object.assign({},s,{[k]:!s[k]}));
-  const rows=[
-    ['background','バックグラウンド進行','他アプリに切り替えてもタイマーを動かし続けます（微小音を再生し続けます）'],
-    ['notify','通知','裏にいる間、ステップ切替を通知でお知らせします'],
-    ['sound','効果音','ステップ切替・完了・残り10秒の予告音'],
-    ['speakStart','開始時の読み上げ','各ステップの開始時に、名前と所要時間を読み上げ'],
-    ['speech','残り30秒の読み上げ','1分以上のステップで「残り30秒です」を読み上げ'],
-    ['vibrate','バイブレーション','切替・完了時に振動'],
-    ['wake','画面スリープ防止','表示中は画面を消灯させない'],
-  ];
-  const req=async()=>{const r=await askNotify();setPerm(r);if(r!=='granted')alert('通知が許可されませんでした。端末の設定からこのサイトの通知を有効にしてください。');};
-  const exportRoutines=()=>download('ritcho-routines-'+todayStr()+'.json',
-    JSON.stringify({app:'律帖',type:'routines',version:1,exportedAt:new Date().toISOString(),routines},null,2),'application/json');
-  const onFile=e=>{
-    const f=e.target.files&&e.target.files[0];if(!f)return;
-    const mode=confirm('既存のルーチンを置き換えますか？\n\n［OK］置き換え　／　［キャンセル］追加読み込み')?'replace':'append';
-    const rd=new FileReader();
-    rd.onload=()=>{
-      try{
-        const data=JSON.parse(rd.result);
-        const arr=Array.isArray(data)?data:(data.routines||[]);
-        const clean=arr.filter(r=>r&&Array.isArray(r.steps)).map(r=>({
-          id:uid(),name:String(r.name||'読み込み').slice(0,60),
-          steps:r.steps.map(s=>({id:uid(),name:String(s.name||'').slice(0,60),seconds:Math.max(1,parseInt(s.seconds,10)||60),color:s.color||'#c4402f'}))
-        })).filter(r=>r.steps.length);
-        if(!clean.length){alert('読み込めるルーチンが見つかりませんでした。');return;}
-        onImport(clean,mode);
-        alert(clean.length+'件のルーチンを'+(mode==='replace'?'置き換え':'追加')+'ました。');
-      }catch(err){alert('読み込めませんでした（JSON形式を確認してください）。');}
-      e.target.value='';
-    };
-    rd.readAsText(f);
-  };
-  return (
-    <div>
-      <div className="sub-head"><button className="icon-btn" onClick={onBack}>←</button><h2>設定</h2></div>
-      <div className="set-title">バックグラウンド</div>
-      <div className="set-section">
-        {rows.slice(0,2).map(r=>(
-          <div className="toggle-row" key={r[0]}>
-            <div><div className="t-name">{r[1]}</div><div className="t-desc">{r[2]}</div></div>
-            <label className="sw"><input type="checkbox" checked={!!settings[r[0]]} onChange={()=>toggle(r[0])} /><span className="track"/><span className="knob"/></label>
-          </div>
-        ))}
-        <div className="perm-row">
-          <div><div className="t-name">通知の許可</div><div className="t-desc">初回は許可が必要です</div></div>
-          {perm==='granted'
-            ? <span className="perm-state ok">許可済み</span>
-            : <button className="btn btn-ghost" onClick={req}>許可する</button>}
-        </div>
-      </div>
-      <p className="hint">バックグラウンド進行をオンにすると、律帖は実行中ずっと微小な音を鳴らし続けます。これにより他のアプリを使っている間もタイマーが止まりません。通知が届かない場合は、端末の設定でこのサイトの通知と「バッテリー最適化の除外」を確認してください。</p>
-      <div className="set-title">通知音・振動</div>
-      <div className="set-section">
-        {rows.slice(2).map(r=>(
-          <div className="toggle-row" key={r[0]}>
-            <div><div className="t-name">{r[1]}</div><div className="t-desc">{r[2]}</div></div>
-            <label className="sw"><input type="checkbox" checked={!!settings[r[0]]} onChange={()=>toggle(r[0])} /><span className="track"/><span className="knob"/></label>
-          </div>
-        ))}
-      </div>
-      <div className="set-title">バックアップ（JSON）</div>
-      <div className="set-section">
-        <div className="backup-row">
-          <button className="btn btn-ghost" onClick={exportRoutines}>書き出す</button>
-          <button className="btn btn-ghost" onClick={()=>fileRef.current&&fileRef.current.click()}>読み込む</button>
-        </div>
-      </div>
-      <p className="hint">全ルーチンをJSONファイルとして保存します。機種変更や別端末への移行時は、そのファイルを「読み込む」で復元できます。読み込み時に置き換え／追加を選べます。</p>
-      <input ref={fileRef} type="file" accept="application/json,.json" style={{display:'none'}} onChange={onFile} />
-    </div>
-  );
-}
-
-/* ================= LOG ================= */
-function LogView({logs,onDelete,onClear,onBack}){
-  const [from,setFrom]=useState(shiftDay(todayStr(),-6));
-  const [to,setTo]=useState(todayStr());
-  const preset=n=>{setTo(todayStr());setFrom(n===null?'2000-01-01':shiftDay(todayStr(),-(n-1)));};
-  const filtered=logs.filter(e=>{const d=localDate(e.startISO);return d>=from&&d<=to;}).sort((a,b)=>a.startISO<b.startISO?1:-1);
-  const sumActual=filtered.reduce((a,e)=>a+(e.actualSec||0),0);
-  const groups=[];
-  filtered.forEach(e=>{const d=localDate(e.startISO);let g=groups.find(x=>x.d===d);if(!g){g={d,items:[]};groups.push(g);}g.items.push(e);});
-  const buildMd=()=>{
-    let md='# 律帖 実施ログ  '+from+' 〜 '+to+'\n\n（'+filtered.length+'件 / 合計実施 '+fmtLong(sumActual)+'）\n';
-    groups.forEach(g=>{
-      const dt=new Date(g.d+'T00:00:00');
-      md+='\n## '+g.d+' ('+WD[dt.getDay()]+')\n';
-      g.items.slice().reverse().forEach(e=>{
-        md+='- **'+hhmm(e.startISO)+'** '+e.routineName+' — 計画 '+fmtLong(e.plannedSec)+' / 実施 '+fmtLong(e.actualSec)+' — '+(e.completed?'✅ 完了':'⏸ 中断')+' ('+e.stepsDone+'/'+e.stepsTotal+')'+(e.skipped?' ・スキップ '+e.skipped:'')+'\n';
-        (e.steps||[]).forEach(s=>{const val=s.skipped?'スキップ':(s.actualSec?fmtLong(s.actualSec):'—');md+='    - '+(s.name||'（無題）')+'　'+fmtLong(s.plannedSec)+' / '+val+'\n';});
-      });
-    });
-    return md;
-  };
-  return (
-    <div>
-      <div className="sub-head"><button className="icon-btn" onClick={onBack}>←</button><h2>実施ログ</h2></div>
-      <div className="range-row">
-        <input type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)} />
-        <span>〜</span>
-        <input type="date" value={to} min={from} max={todayStr()} onChange={e=>setTo(e.target.value)} />
-      </div>
-      <div className="chips">
-        <button className="chip" onClick={()=>preset(1)}>今日</button>
-        <button className="chip" onClick={()=>preset(7)}>7日</button>
-        <button className="chip" onClick={()=>preset(30)}>30日</button>
-        <button className="chip" onClick={()=>preset(null)}>全て</button>
-      </div>
-      <div className="exp-row">
-        <button className="btn btn-ghost" disabled={!filtered.length} onClick={()=>download('ritcho-log-'+from+'_'+to+'.md',buildMd(),'text/markdown;charset=utf-8')}>Markdownで書き出す</button>
-        <button className="btn btn-ghost" disabled={!filtered.length} onClick={()=>download('ritcho-log-'+from+'_'+to+'.json',JSON.stringify({app:'律帖',type:'logs',version:1,from,to,exportedAt:new Date().toISOString(),logs:filtered},null,2),'application/json')}>JSON</button>
-      </div>
-      <div className="log-summary"><b>{filtered.length}</b> 件　/　合計実施 <b>{fmtLong(sumActual)}</b></div>
-      {filtered.length===0 ? (<div className="empty" style={{padding:'40px 20px'}}><p>この期間の記録はありません。</p></div>)
-      : groups.map(g=>{
-        const dt=new Date(g.d+'T00:00:00');
-        return (
-          <div className="log-group" key={g.d}>
-            <div className="log-date">{g.d}（{WD[dt.getDay()]}）</div>
-            {g.items.map(e=>(
-              <div className="log-item" key={e.id}>
-                <div className="log-time">{hhmm(e.startISO)}</div>
-                <div className="log-body">
-                  <div className="log-rn">{e.routineName}</div>
-                  <div className="log-sub">実施 {fmtLong(e.actualSec)} · 計画 {fmtLong(e.plannedSec)} · {e.stepsDone}/{e.stepsTotal}{e.skipped?' · スキップ '+e.skipped:''}</div>
-                </div>
-                <span className={'log-badge '+(e.completed?'badge-ok':'badge-cut')}>{e.completed?'完了':'中断'}</span>
-                <button className="log-x" onClick={()=>onDelete(e.id)}>×</button>
-              </div>
-            ))}
-          </div>
-        );
-      })}
-      {logs.length>0&&<button className="clear-all" onClick={onClear}>全ての記録を削除</button>}
-    </div>
-  );
-}
-
-/* ================= APP ================= */
-function App(){
-  const [routines,setRoutines]=useState(()=>{const s=load(RKEY,null);if(s)return s;save(RKEY,seed);return seed;});
-  const [logs,setLogs]=useState(()=>load(LKEY,[]));
-  const [settings,setSettings]=useState(()=>{
-    const s=Object.assign({sound:true,speech:true,speakStart:true,vibrate:true,wake:true,background:true,notify:true},load(SKEY,{}));
-    Object.assign(SETTINGS,s);return s;});
-  const [view,setView]=useState({name:'list'});
-
-  useEffect(()=>save(RKEY,routines),[routines]);
-  useEffect(()=>save(LKEY,logs),[logs]);
-  useEffect(()=>{Object.assign(SETTINGS,settings);save(SKEY,settings);},[settings]);
-
-  const byId=id=>routines.find(r=>r.id===id);
-  const startRun=async id=>{if(SETTINGS.notify)await askNotify();setView({name:'run',id});};
-  const newRoutine=()=>setView({name:'edit',routine:{id:uid(),name:'',steps:[{id:uid(),name:'',seconds:60,color:'#c4402f'}]}});
-  const saveRoutine=r=>{setRoutines(rs=>rs.some(x=>x.id===r.id)?rs.map(x=>x.id===r.id?r:x):rs.concat([r]));setView({name:'list'});};
-  const delRoutine=id=>{if(confirm('このルーチンを削除しますか？'))setRoutines(rs=>rs.filter(r=>r.id!==id));};
-  const addLog=e=>setLogs(ls=>ls.concat([e]).slice(-800));
-  const importRoutines=(clean,mode)=>setRoutines(rs=>mode==='replace'?clean:rs.concat(clean));
-
-  if(view.name==='run')return <RunView routine={byId(view.id)} onLog={addLog} onExit={()=>setView({name:'list'})} />;
-  if(view.name==='edit')return <EditView routine={view.routine||byId(view.id)} onSave={saveRoutine} onCancel={()=>setView({name:'list'})} />;
-  if(view.name==='settings')return <SettingsView settings={settings} setSettings={setSettings} routines={routines} onImport={importRoutines} onBack={()=>setView({name:'list'})} />;
-  if(view.name==='log')return <LogView logs={logs} onDelete={id=>setLogs(ls=>ls.filter(l=>l.id!==id))} onClear={()=>{if(confirm('全ての実施ログを削除しますか？'))setLogs([]);}} onBack={()=>setView({name:'list'})} />;
-  return <ListView routines={routines} onRun={startRun} onEdit={id=>setView({name:'edit',id})} onNew={newRoutine} onDelete={delRoutine} onOpenLog={()=>setView({name:'log'})} onOpenSettings={()=>setView({name:'settings'})} />;
-}
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-</script>
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
